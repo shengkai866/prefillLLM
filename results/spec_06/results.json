@@ -1,0 +1,459 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "big",
+   "small",
+   "hyb",
+   "attn_small:0.05:sent",
+   "attn_small:0.1:sent",
+   "attn_small:0.2:sent",
+   "drop-attn_small:0.05:sent",
+   "drop-attn_small:0.1:sent",
+   "drop-attn_small:0.2:sent",
+   "spec:0.1",
+   "spec:0.2",
+   "specprefill:0.1",
+   "specprefill:0.2",
+   "specprefill:0.3",
+   "specprefill:0.5",
+   "specprefill:0.1:lah1"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r2_mix8k/projector.pt",
+   "configs": "big,small,hyb,attn_small:0.05:sent,attn_small:0.1:sent,attn_small:0.2:sent,drop-attn_small:0.05:sent,drop-attn_small:0.1:sent,drop-attn_small:0.2:sent,spec:0.1,spec:0.2,specprefill:0.1,specprefill:0.2,specprefill:0.3,specprefill:0.5,specprefill:0.1:lah1",
+   "speed_configs": "big,small,hyb,attn_small:0.05:sent,attn_small:0.1:sent,attn_small:0.2:sent,drop-attn_small:0.05:sent,drop-attn_small:0.1:sent,drop-attn_small:0.2:sent,spec:0.1,spec:0.2,specprefill:0.1,specprefill:0.2,specprefill:0.3,specprefill:0.5,specprefill:0.1:lah1",
+   "tasks": "speed,niah,ruler,qa",
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_qa": 50,
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "speed_lengths": "4096,8192,16384,32768",
+   "speed_reps": 5,
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/spec_06",
+   "force": false,
+   "plot_only": false
+  },
+  "proj_step": 12000,
+  "time": "2026-10-23 01:32:06"
+ },
+ "speed": [
+  {
+   "prompt_len": 4096,
+   "big": 0.3838976128026843,
+   "small": 0.04850481264293194,
+   "hyb": 0.14120266772806644,
+   "attn_small:0.05:sent": 0.16383219975978136,
+   "attn_small:0.1:sent": 0.17096908949315548,
+   "attn_small:0.2:sent": 0.21469669230282307,
+   "drop-attn_small:0.05:sent": 0.09561400674283504,
+   "drop-attn_small:0.1:sent": 0.10127194318920374,
+   "drop-attn_small:0.2:sent": 0.13482332415878773,
+   "spec:0.1": 0.3074585981667042,
+   "spec:0.2": 0.3524888763204217,
+   "specprefill:0.1": 0.23296223673969507,
+   "specprefill:0.2": 0.26561956852674484,
+   "specprefill:0.3": 0.2972537502646446,
+   "specprefill:0.5": 0.35903143882751465,
+   "specprefill:0.1:lah1": 0.09804269019514322
+  },
+  {
+   "prompt_len": 8192,
+   "big": 0.9004858490079641,
+   "small": 0.13135479390621185,
+   "hyb": 0.2914547035470605,
+   "attn_small:0.05:sent": 0.3341037193313241,
+   "attn_small:0.1:sent": 0.39545129239559174,
+   "attn_small:0.2:sent": 0.4991631582379341,
+   "drop-attn_small:0.05:sent": 0.19018229190260172,
+   "drop-attn_small:0.1:sent": 0.22885018400847912,
+   "drop-attn_small:0.2:sent": 0.29467267636209726,
+   "spec:0.1": 0.5250020632520318,
+   "spec:0.2": 0.6243797736242414,
+   "specprefill:0.1": 0.35038238018751144,
+   "specprefill:0.2": 0.41726291831582785,
+   "specprefill:0.3": 0.4924314012750983,
+   "specprefill:0.5": 0.6618173802271485,
+   "specprefill:0.1:lah1": 0.2148508196696639
+  },
+  {
+   "prompt_len": 16384,
+   "big": 2.1028761081397533,
+   "small": 0.39390772115439177,
+   "hyb": 0.6869339011609554,
+   "attn_small:0.05:sent": 0.8395651821047068,
+   "attn_small:0.1:sent": 0.991719564422965,
+   "attn_small:0.2:sent": 1.2981996405869722,
+   "drop-attn_small:0.05:sent": 0.5088603887706995,
+   "drop-attn_small:0.1:sent": 0.5735611179843545,
+   "drop-attn_small:0.2:sent": 0.737114081159234,
+   "spec:0.1": 1.1361950300633907,
+   "spec:0.2": 1.4404951613396406,
+   "specprefill:0.1": 0.6935055563226342,
+   "specprefill:0.2": 0.8521900931373239,
+   "specprefill:0.3": 1.048776444979012,
+   "specprefill:0.5": 1.4687128812074661,
+   "specprefill:0.1:lah1": 0.5610861461609602
+  },
+  {
+   "prompt_len": 32768,
+   "big": 5.0394470654428005,
+   "small": 1.1801303997635841,
+   "hyb": 1.7464404571801424,
+   "attn_small:0.05:sent": 2.2597709940746427,
+   "attn_small:0.1:sent": 2.7245936961844563,
+   "attn_small:0.2:sent": 3.771953845396638,
+   "drop-attn_small:0.05:sent": 1.3907554289326072,
+   "drop-attn_small:0.1:sent": 1.5585636952891946,
+   "drop-attn_small:0.2:sent": 1.9595799148082733,
+   "spec:0.1": 2.844434049911797,
+   "spec:0.2": 3.8915951754897833,
+   "specprefill:0.1": 1.6587273087352514,
+   "specprefill:0.2": 2.06581246573478,
+   "specprefill:0.3": 2.495214154943824,
+   "specprefill:0.5": 3.4784483229741454,
+   "specprefill:0.1:lah1": 1.5122544169425964
+  }
+ ],
+ "niah": [
+  {
+   "config": "big",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 1.0
+  },
+  {
+   "config": "small",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.0
+  },
+  {
+   "config": "small",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 0.9666666666666667,
+   "frac": 0.0
+  },
+  {
+   "config": "small",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 0.9666666666666667,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.0
+  },
+  {
+   "config": "attn_small:0.05:sent",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.059864709021940105
+  },
+  {
+   "config": "attn_small:0.05:sent",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.05519252901095682
+  },
+  {
+   "config": "attn_small:0.05:sent",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.05234233344136948
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.10824015123756836
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.1042166050490133
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.10244509266132527
+  },
+  {
+   "config": "attn_small:0.2:sent",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.20787117343606926
+  },
+  {
+   "config": "attn_small:0.2:sent",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.20552113171640682
+  },
+  {
+   "config": "attn_small:0.2:sent",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.20281334432281664
+  },
+  {
+   "config": "drop-attn_small:0.05:sent",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 0.9,
+   "frac": 0.059864709021940105
+  },
+  {
+   "config": "drop-attn_small:0.05:sent",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.05519252901095682
+  },
+  {
+   "config": "drop-attn_small:0.05:sent",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.05234233344136948
+  },
+  {
+   "config": "drop-attn_small:0.1:sent",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.10824015123756836
+  },
+  {
+   "config": "drop-attn_small:0.1:sent",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.1042166050490133
+  },
+  {
+   "config": "drop-attn_small:0.1:sent",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.10244509266132527
+  },
+  {
+   "config": "drop-attn_small:0.2:sent",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.20787117343606926
+  },
+  {
+   "config": "drop-attn_small:0.2:sent",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.20552113171640682
+  },
+  {
+   "config": "drop-attn_small:0.2:sent",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.20281334432281664
+  },
+  {
+   "config": "spec:0.1",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.11118926440593964
+  },
+  {
+   "config": "spec:0.1",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.10802888485813622
+  },
+  {
+   "config": "spec:0.1",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.10028907684855075
+  },
+  {
+   "config": "spec:0.2",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.20980876799484907
+  },
+  {
+   "config": "spec:0.2",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.2005978729519977
+  },
+  {
+   "config": "spec:0.2",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.20166495551350277
+  },
+  {
+   "config": "specprefill:0.1",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.1110375884569433
+  },
+  {
+   "config": "specprefill:0.1",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.10809136368133834
+  },
+  {
+   "config": "specprefill:0.1",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.10039096105910394
+  },
+  {
+   "config": "specprefill:0.2",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.20628356112227078
+  },
+  {
+   "config": "specprefill:0.2",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.20719232327230075
+  },
+  {
+   "config": "specprefill:0.2",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.20081243517343653
+  },
+  {
+   "config": "specprefill:0.3",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.3015295337875983
+  },
+  {
+   "config": "specprefill:0.3",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.3062932828632631
+  },
+  {
+   "config": "specprefill:0.3",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.3012339092877691
+  },
+  {
+   "config": "specprefill:0.5",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.5078958078958079
+  },
+  {
+   "config": "specprefill:0.5",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.5044952020451879
+  },
+  {
+   "config": "specprefill:0.5",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.5020768575164343
+  },
+  {
+   "config": "specprefill:0.1:lah1",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.1110375884569433
+  },
+  {
+   "config": "specprefill:0.1:lah1",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.10809136368133834
+  },
+  {
+   "config": "specprefill:0.1:lah1",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.10039096105910394
+  }
+ ]
+}

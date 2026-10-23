@@ -2,8 +2,13 @@
 """
 Selective-recompute experiment (prefill/recompute.py) with the round-2 mix-8k projector. No training.
 
-Configs:  big (8B alone) | hyb (hybrid, nothing recomputed) | <scorer>:<fraction of middle tokens>[:<unit>] | oracle
-          unit: omitted = single tokens (max-pooled scores) | bN = fixed blocks of N tokens | sent = sentence/line segments
+Configs:  big (8B alone) | small (small model alone) | hyb (hybrid, nothing recomputed) | oracle
+          <scorer>:<fraction of middle tokens>[:<unit>]        recompute, the other middle tokens get projected KV
+          drop-<scorer>:<fraction of middle tokens>[:<unit>]   same selection, the other middle tokens are DROPPED
+          specprefill:<fraction of the whole prompt>[:lahN]    SpecPrefill baseline (official defaults, look-ahead 8)
+          scorer: attn_small | attn_big | spec (SpecPrefill importance) | random | recent
+          unit: omitted = single tokens (max-pooled scores; spec: 32-token chunks) | bN = fixed blocks of N tokens |
+                sent = sentence/line segments
 Tasks (stored in results.json as each finishes; finished tasks are skipped on restart):
   ruler    RULER 4096 / 8192, 13 tasks, same examples as round 2 (same seeds)
   qa       SQuAD v2 / HotpotQA / TriviaQA at ~3.5k / ~7.5k tokens (first n of the round-2 pool)
@@ -38,7 +43,8 @@ FRACS = (0.02, 0.05, 0.1, 0.2)
 DEFAULT_CFGS = ["big", "hyb"] + [f"{s}:{f}" for s in ("attn_big", "attn_small") for f in FRACS] + \
                ["random:0.1", "random:0.2", "recent:0.1", "recent:0.2", "oracle"]
 SPEED_CFGS = ["big", "hyb"] + [f"{s}:{f}" for s in ("attn_big", "attn_small") for f in (0.05, 0.1, 0.2)] + ["random:0.1"]
-SCORER_ZH = {"attn_big": f"{C.LARGE_NAME} 注意力", "attn_small": f"{C.SMALL_NAME} 注意力", "random": "随机", "recent": "最近（加长尾部）", "oracle": "理想（答案位置）"}
+SCORER_ZH = {"attn_big": f"{C.LARGE_NAME} 注意力", "attn_small": f"{C.SMALL_NAME} 注意力", "random": "随机", "recent": "最近（加长尾部）",
+             "oracle": "理想（答案位置）", "spec": f"SpecPrefill 打分（{C.SMALL_NAME}）"}
 
 
 def parse(cfg):
@@ -47,11 +53,11 @@ def parse(cfg):
         return cfg, 0.0, None
     s, f, *u = cfg.split(":")
     u = u[0] if u else None
-    return s, float(f), (None if u is None else "sent" if u == "sent" else int(u[1:]))
+    return s, float(f), (None if u is None else u if u == "sent" or u.startswith("lah") else int(u[1:]))
 
 
 def unit_zh(u):
-    return "逐 token" if u is None else "按句子" if u == "sent" else f"{u} token 一块"
+    return "逐 token" if u is None else "按句子" if u == "sent" else f"look-ahead {u[3:]}" if str(u).startswith("lah") else f"{u} token 一块"
 
 
 def label(cfg):
@@ -64,6 +70,10 @@ def label(cfg):
         return "混合，不重算"
     if s == "oracle":
         return SCORER_ZH["oracle"]
+    if s == "specprefill":
+        return f"SpecPrefill 保留整段 {f:.0%}" + (f"，{unit_zh(u)}" if u is not None else "")
+    if s.startswith("drop-"):
+        return f"丢弃其余（不投影）：{SCORER_ZH[s[5:]]} {f:.0%}" + (f"，{unit_zh(u)}" if u is not None else "")
     return f"{SCORER_ZH[s]} {f:.0%}" + (f"，{unit_zh(u)}" if u is not None else "")
 
 
@@ -78,8 +88,9 @@ class Engine:
         self.proj_step = ck.get("step")
         # sentence/line boundary tokens for 'sent' units
         boundary = torch.tensor([any(ch in tok.decode([i]) for ch in ".!?\n") for i in range(len(tok))], device=dev)
-        self.rh = RecomputeHybrid(self.S, self.L, FoldedProjectorKV(p, self.L), n_sink=n_sink, n_tail=n_tail, boundary=boundary)
         self.eos = eos_ids(tok)
+        self.rh = RecomputeHybrid(self.S, self.L, FoldedProjectorKV(p, self.L), n_sink=n_sink, n_tail=n_tail, boundary=boundary,
+                                  eos=self.eos)
 
     def needles(self, answers):
         out = []
@@ -91,7 +102,8 @@ class Engine:
 
     @torch.no_grad()
     def prefill(self, cfg, ids, answers=()):
-        """-> (kbuf, vbuf, logits, fraction of middle tokens recomputed)"""
+        """-> (kbuf, vbuf, logits, fraction of middle tokens recomputed; specprefill: fraction of the prompt kept).
+        drop-* and specprefill return a compact cache (shorter than the prompt)."""
         s, f, u = parse(cfg)
         if s == "big":
             return (*self.fb.prefill(ids), 1.0)
@@ -99,7 +111,11 @@ class Engine:
             return None, None, self.S.prefill(ids)[0], 0.0
         if s == "hyb":
             return (*self.rh.prefill(ids), 0.0)
-        kb, vb, lg, n = self.rh.prefill_sel(ids, s, f, needles=self.needles(answers) if s == "oracle" else None, seg=u)
+        if s == "specprefill":
+            kb, vb, lg, n = self.rh.prefill_specprefill(ids, f, n_lah=int(u[3:]) if u else None)
+            return kb, vb, lg, n / ids.shape[0]
+        kb, vb, lg, n = self.rh.prefill_sel(ids, s.removeprefix("drop-"), f, needles=self.needles(answers) if s == "oracle" else None,
+                                            seg=u, drop=s.startswith("drop-"))
         _, m, _ = split_prompt(ids.shape[0], self.rh.n_sink, self.rh.n_tail)
         return kb, vb, lg, n / max(m, 1)
 
@@ -111,7 +127,8 @@ class Engine:
             out = greedy_decode(self.small, cache, lg, max_new, self.eos)
             return self.tok.decode(out, skip_special_tokens=True), 0.0
         kb, vb, lg, frac = self.prefill(cfg, ids, answers)
-        out = greedy_decode(self.large, kv_to_dynamic_cache(kb, vb), lg, max_new, self.eos)
+        T = ids.shape[0]
+        out = greedy_decode(self.large, kv_to_dynamic_cache(kb, vb), lg, max_new, self.eos, pos0=T if kb.shape[2] != T else None)
         return self.tok.decode(out, skip_special_tokens=True), frac
 
     def chat_ids(self, messages, assistant_prefix=""):
@@ -267,9 +284,13 @@ def write_summary(res, path):
     cfgs = res["meta"]["configs"]
     L = ["# 选择性重算实验", "",
          f"GPU：{res['meta']['gpu']}；生成：{res['meta']['time']}；projector：混合数据 8k（第 {res['meta'].get('proj_step')} 步）。"
-         f"小模型：{C.SMALL_NAME}，大模型：{C.LARGE_NAME}。开头 8 个和最后 64 个 token 始终由大模型计算；“重算比例”是中间部分由大模型重新计算的 token 占比。", ""]
+         f"小模型：{C.SMALL_NAME}，大模型：{C.LARGE_NAME}。开头 8 个和最后 64 个 token 始终由大模型计算；“重算比例”是中间部分由大模型重新计算的 token 占比。"
+         "“丢弃其余”配置的选择方式与对应的重算配置完全相同，只是没选中的中间 token 被丢掉而不是用投影 KV 补上；"
+         "SpecPrefill 是原论文方法（小模型打分，按 32 token 一块保留整段 prompt 的一部分，不强制保留开头和结尾，不用 projector），它的比例是整段 prompt 保留的比例。", ""]
     if os.path.exists(os.path.join(os.path.dirname(path), "figures", "quality_vs_frac.png")):
         L += ["![质量与重算比例](figures/quality_vs_frac.png)", ""]
+    if os.path.exists(os.path.join(os.path.dirname(path), "figures", "pareto.png")):
+        L += ["![质量与首 token 加速比](figures/pareto.png)", ""]
     L += ["## 总表", "", "| 配置 | 实际重算比例（RULER 8k） | RULER 4k | RULER 8k | 问答 F1 4k | 问答 F1 8k | 大海捞针 |", "|---|---|---|---|---|---|---|"]
     for c in cfgs:
         fr = "全部" if c == "big" else fmt(ruler_frac(res, c, 8192), '{:.1%}')
@@ -327,8 +348,11 @@ def plot(res, out_dir):
         "legend.frameon": False})
     # one series per (scorer, selection unit); categorical slots of the validated palette in fixed order
     PAL = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
-    NAME = {"attn_big": f"{C.LARGE_NAME} attention", "attn_small": f"{C.SMALL_NAME} attention", "random": "random", "recent": "recent (longer tail)"}
-    unit_en = lambda u: "" if u is None else ", sentences" if u == "sent" else f", blocks of {u}"
+    NAME = {"attn_big": f"{C.LARGE_NAME} attention", "attn_small": f"{C.SMALL_NAME} attention", "random": "random", "recent": "recent (longer tail)",
+            "spec": "SpecPrefill scores"}
+    NAME.update({f"drop-{k}": f"{v}, rest DROPPED" for k, v in list(NAME.items())})
+    NAME["specprefill"] = "SpecPrefill (x = % of whole prompt kept)"
+    unit_en = lambda u: "" if u is None else ", sentences" if u == "sent" else f", look-ahead {u[3:]}" if str(u).startswith("lah") else f", blocks of {u}"
     cfgs = res["meta"]["configs"]
     series = []
     for c in cfgs:
@@ -373,6 +397,43 @@ def plot(res, out_dir):
     fig.tight_layout()
     os.makedirs(os.path.join(out_dir, "figures"), exist_ok=True)
     fig.savefig(os.path.join(out_dir, "figures", "quality_vs_frac.png"), dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+    # quality vs measured TTFT speedup over the large model at the same prompt length (needs the speed task)
+    sp = {r["prompt_len"]: r for r in res.get("speed", [])}
+    pan = [(f"RULER {Ln // 1024}k", Ln, (lambda Ln: lambda c: ruler_mean(res, c, Ln))(Ln)) for Ln in (4096, 8192)] + \
+          [(f"Document QA F1, ~{b}", Ln, (lambda b: lambda c: qa_mean(res, c, b))(b)) for b, Ln in (("4k", 4096), ("8k", 8192))]
+    pan = [p for p in pan if p[1] in sp and sp[p[1]].get("big")]
+    if not pan:
+        return
+    fig, axes = plt.subplots(1, len(pan), figsize=(4.6 * len(pan), 4.4), squeeze=False)
+    for ax, (title, Ln, val) in zip(axes[0], pan):
+        row = sp[Ln]
+        spd = lambda c: row["big"] / row[c] if row.get(c) else None
+        for (sc, u), col in zip(series, PAL):
+            pts = sorted((spd(c), val(c), parse(c)[1]) for c in cfgs if parse(c)[0] == sc and parse(c)[2] == u
+                         and spd(c) is not None and val(c) is not None)
+            if pts:
+                ax.plot([x for x, _, _ in pts], [y for _, y, _ in pts], color=col, lw=2, marker="o", ms=6, mec=SURFACE, mew=1.5,
+                        label=NAME[sc] + unit_en(u), zorder=3)
+                for x, y, f in pts:
+                    ax.annotate(f"{f:.0%}", (x, y), xytext=(4, 4), textcoords="offset points", fontsize=7, color=col)
+        for ref, mk in (("big", "*"), ("small", "s"), ("hyb", "D")):
+            x, y = spd(ref) if ref != "big" else 1.0, val(ref)
+            if x is not None and y is not None:
+                ax.plot([x], [y], marker=mk, ms=9, color=TEXT2, ls="none", zorder=4)
+                ax.annotate({"big": f"{C.LARGE_NAME}", "small": f"{C.SMALL_NAME}", "hyb": "hybrid, 0%"}[ref], (x, y),
+                            xytext=(5, -10), textcoords="offset points", fontsize=7.5, color=TEXT2)
+        ax.set_title(title, loc="left")
+        ax.set_xlabel(f"TTFT speedup over {C.LARGE_NAME} at {Ln} tokens (x)")
+        ax.set_ylim(0, 1.02)
+    axes[0, 0].set_ylabel("score")
+    h, lab = max((ax.get_legend_handles_labels() for ax in axes[0]), key=lambda x: len(x[0]))
+    if h:
+        fig.legend(h, lab, loc="lower center", ncol=min(3, len(h)), bbox_to_anchor=(0.5, -0.12))
+    fig.suptitle(f"Quality vs. TTFT speedup ({C.SMALL_NAME} -> {C.LARGE_NAME}; labels = kept / recomputed fraction)", y=1.02)
+    fig.tight_layout()
+    fig.savefig(os.path.join(out_dir, "figures", "pareto.png"), dpi=150, bbox_inches="tight")
     plt.close(fig)
 
 

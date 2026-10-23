@@ -91,11 +91,13 @@ class FastQwen3:
         T = o.shape[1]
         return h + F.linear(o.transpose(0, 1).reshape(T, self.H * self.D), lw["wo"])
 
-    def prefill(self, ids, kbuf=None, vbuf=None, collect=False, logits=True):
-        """Causal prefill of ids [T] from position 0. Optionally writes K/V into kbuf/vbuf [L,Hkv,>=T,D].
+    def prefill(self, ids, kbuf=None, vbuf=None, collect=False, logits=True, pos=None, last_q=None):
+        """Causal prefill of ids [T] from position 0, or at sorted absolute positions pos [T] (tokens not in pos are
+        simply absent, as in SpecPrefill). Optionally writes K/V into kbuf/vbuf [L,Hkv,>=T,D] and appends the last
+        token's query [H,1,D] of every layer to the list last_q.
         Returns (last-token logits [1,V] or None, stacked hidden states [L+1,T,d] like HF output_hidden_states or None)."""
         T = ids.shape[0]
-        cos, sin = self.cos[:T], self.sin[:T]
+        cos, sin = (self.cos[:T], self.sin[:T]) if pos is None else (self.cos[pos], self.sin[pos])
         h = F.embedding(ids, self.embed)
         hs = [h] if collect else None
         for i, lw in enumerate(self.layers):
@@ -103,6 +105,8 @@ class FastQwen3:
             if kbuf is not None:
                 kbuf[i, :, :T] = k
                 vbuf[i, :, :T] = v
+            if last_q is not None:
+                last_q.append(q[:, -1:])
             o = F.scaled_dot_product_attention(q[None], k.repeat_interleave(self.rep, 0)[None],
                                                v.repeat_interleave(self.rep, 0)[None], is_causal=True,
                                                scale=self.scaling)[0]

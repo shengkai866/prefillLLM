@@ -184,8 +184,10 @@ def teacher_forward(model, ids, prompt_len):
 
 
 @torch.no_grad()
-def greedy_decode(model, cache, first_logits, max_new_tokens, eos_ids=(), timing=None):
-    """Greedy decode from a prefilled cache. Returns list[int] of generated ids (B must be 1)."""
+def greedy_decode(model, cache, first_logits, max_new_tokens, eos_ids=(), timing=None, pos0=None):
+    """Greedy decode from a prefilled cache. Returns list[int] of generated ids (B must be 1).
+    pos0: RoPE position of the first fed-back token when it differs from the cache length (compact caches of
+    SpecPrefill-style dropping keep the original positions, so decoding continues at the original prompt length)."""
     dev = first_logits.device
     t0 = time.perf_counter()
     nxt = first_logits.argmax(-1)  # [1]
@@ -193,7 +195,8 @@ def greedy_decode(model, cache, first_logits, max_new_tokens, eos_ids=(), timing
     for _ in range(max_new_tokens - 1):
         if out_ids[-1] in eos_ids:
             break
-        out = model(input_ids=nxt.view(1, 1), past_key_values=cache, use_cache=True, logits_to_keep=1)
+        extra = {} if pos0 is None else {"position_ids": torch.tensor([[pos0 + len(out_ids) - 1]], device=dev)}
+        out = model(input_ids=nxt.view(1, 1), past_key_values=cache, use_cache=True, logits_to_keep=1, **extra)
         nxt = out.logits[:, -1].argmax(-1)
         out_ids.append(nxt.item())
     _sync(dev)
