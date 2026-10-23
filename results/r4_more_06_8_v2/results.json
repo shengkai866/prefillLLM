@@ -1,0 +1,225 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "cont"
+  ],
+  "args": {
+   "projectors": "cont=/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r4_more_06_8/projector.pt",
+   "curve_runs": "orig=/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r2_mix8k,cont=/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r4_more_06_8",
+   "tasks": "kl,gsm8k,code,curve",
+   "n_kl": 40,
+   "n_qa": 100,
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "n_curve_kl": 6,
+   "n_curve_ret": 12,
+   "baselines": "",
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/r4_more_06_8_v2",
+   "force": false,
+   "device": "cuda"
+  },
+  "time": "2026-10-16 04:59:00"
+ },
+ "kl": [
+  {
+   "config": "cont",
+   "type": "chat",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.12434833869338036,
+   "top1_agree": 0.9036635845899582
+  },
+  {
+   "config": "cont",
+   "type": "chat",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.10437065768055617,
+   "top1_agree": 0.9143102213740348
+  },
+  {
+   "config": "cont",
+   "type": "code",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.14400893850252033,
+   "top1_agree": 0.93125
+  },
+  {
+   "config": "cont",
+   "type": "code",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.15290316347964109,
+   "top1_agree": 0.923828125
+  },
+  {
+   "config": "cont",
+   "type": "math",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.02031419057166204,
+   "top1_agree": 0.9765944465994835
+  },
+  {
+   "config": "cont",
+   "type": "math",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.011140151391737163,
+   "top1_agree": 0.9818031623959541
+  },
+  {
+   "config": "cont",
+   "type": "qa",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.3555536246126394,
+   "top1_agree": 0.9224546775221825
+  },
+  {
+   "config": "cont",
+   "type": "qa",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.3000415627512666,
+   "top1_agree": 0.8957503348588943
+  },
+  {
+   "config": "cont",
+   "type": "retrieval",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.052607990175032884,
+   "top1_agree": 0.9852467760443687
+  },
+  {
+   "config": "cont",
+   "type": "retrieval",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.030773167556214887,
+   "top1_agree": 0.9874782726168633
+  },
+  {
+   "config": "cont",
+   "type": "web",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.09125435634050519,
+   "top1_agree": 0.91923828125
+  },
+  {
+   "config": "cont",
+   "type": "web",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.13396577136591076,
+   "top1_agree": 0.89072265625
+  }
+ ],
+ "gsm8k": [
+  {
+   "config": "cont",
+   "n": 150,
+   "accuracy": 0.88,
+   "format_follow": 0.5266666666666666,
+   "prompt_tokens": 2035.4133333333334
+  }
+ ],
+ "code": [
+  {
+   "config": "cont",
+   "bucket": "4k",
+   "n": 100,
+   "exact_match": 0.16,
+   "similarity": 0.5734381241383011
+  },
+  {
+   "config": "cont",
+   "bucket": "8k",
+   "n": 100,
+   "exact_match": 0.25,
+   "similarity": 0.6078550937476873
+  }
+ ],
+ "curve": [
+  {
+   "run": "orig",
+   "step": 2000,
+   "kl_4k": 0.49037519335332846,
+   "retrieval_acc": 0.5208333333333334
+  },
+  {
+   "run": "orig",
+   "step": 4000,
+   "kl_4k": 0.18518956210260107,
+   "retrieval_acc": 0.7833333333333333
+  },
+  {
+   "run": "orig",
+   "step": 6000,
+   "kl_4k": 0.1639110143328758,
+   "retrieval_acc": 0.9166666666666666
+  },
+  {
+   "run": "orig",
+   "step": 8000,
+   "kl_4k": 0.14361114816802,
+   "retrieval_acc": 0.9041666666666667
+  },
+  {
+   "run": "orig",
+   "step": 10000,
+   "kl_4k": 0.1483800695127684,
+   "retrieval_acc": 0.9583333333333334
+  },
+  {
+   "run": "orig",
+   "step": 12000,
+   "kl_4k": 0.14415755701962654,
+   "retrieval_acc": 0.9583333333333334
+  },
+  {
+   "run": "cont",
+   "step": 2000,
+   "kl_4k": 0.1460051557677136,
+   "retrieval_acc": 0.9958333333333333
+  },
+  {
+   "run": "cont",
+   "step": 4000,
+   "kl_4k": 0.1527653942541873,
+   "retrieval_acc": 0.9875
+  },
+  {
+   "run": "cont",
+   "step": 6000,
+   "kl_4k": 0.1396460073775706,
+   "retrieval_acc": 0.95
+  },
+  {
+   "run": "cont",
+   "step": 8000,
+   "kl_4k": 0.1419217259014355,
+   "retrieval_acc": 0.9625
+  },
+  {
+   "run": "cont",
+   "step": 10000,
+   "kl_4k": 0.13353560924720873,
+   "retrieval_acc": 0.9625
+  },
+  {
+   "run": "cont",
+   "step": 12000,
+   "kl_4k": 0.1355559763768339,
+   "retrieval_acc": 0.9625
+  }
+ ]
+}

@@ -1,0 +1,225 @@
+{
+ "meta": {
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "configs": [
+   "cont"
+  ],
+  "args": {
+   "projectors": "cont=/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r4_more_17_32/projector.pt",
+   "curve_runs": "orig=/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/s17to32_mix8k,cont=/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r4_more_17_32",
+   "tasks": "kl,gsm8k,code,curve",
+   "n_kl": 40,
+   "n_qa": 100,
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "n_curve_kl": 6,
+   "n_curve_ret": 12,
+   "baselines": "",
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/r4_more_17_32_v2",
+   "force": false,
+   "device": "cuda"
+  },
+  "time": "2026-10-16 08:23:39"
+ },
+ "kl": [
+  {
+   "config": "cont",
+   "type": "chat",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.22415896295569837,
+   "top1_agree": 0.8540198668837548
+  },
+  {
+   "config": "cont",
+   "type": "chat",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.19934903727844358,
+   "top1_agree": 0.8634616643190384
+  },
+  {
+   "config": "cont",
+   "type": "code",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.31894727973267434,
+   "top1_agree": 0.8810546875
+  },
+  {
+   "config": "cont",
+   "type": "code",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.3589555017882958,
+   "top1_agree": 0.8736328125
+  },
+  {
+   "config": "cont",
+   "type": "math",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.043163480219664055,
+   "top1_agree": 0.9578631654381752
+  },
+  {
+   "config": "cont",
+   "type": "math",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.032800369791220876,
+   "top1_agree": 0.9672507226467133
+  },
+  {
+   "config": "cont",
+   "type": "qa",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 1.1357094553648495,
+   "top1_agree": 0.733657518774271
+  },
+  {
+   "config": "cont",
+   "type": "qa",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 1.2177397506777197,
+   "top1_agree": 0.6846094824373722
+  },
+  {
+   "config": "cont",
+   "type": "retrieval",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 1.3325572778114292,
+   "top1_agree": 0.6891417309641839
+  },
+  {
+   "config": "cont",
+   "type": "retrieval",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 1.1256505130339065,
+   "top1_agree": 0.7430627979338169
+  },
+  {
+   "config": "cont",
+   "type": "web",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.31502601732499896,
+   "top1_agree": 0.855078125
+  },
+  {
+   "config": "cont",
+   "type": "web",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.2956432651728392,
+   "top1_agree": 0.84892578125
+  }
+ ],
+ "gsm8k": [
+  {
+   "config": "cont",
+   "n": 150,
+   "accuracy": 0.8333333333333334,
+   "format_follow": 0.38,
+   "prompt_tokens": 2035.4133333333334
+  }
+ ],
+ "code": [
+  {
+   "config": "cont",
+   "bucket": "4k",
+   "n": 100,
+   "exact_match": 0.14,
+   "similarity": 0.5273980159115855
+  },
+  {
+   "config": "cont",
+   "bucket": "8k",
+   "n": 100,
+   "exact_match": 0.13,
+   "similarity": 0.5334842885564138
+  }
+ ],
+ "curve": [
+  {
+   "run": "orig",
+   "step": 2000,
+   "kl_4k": 0.7785594363360562,
+   "retrieval_acc": 0.0
+  },
+  {
+   "run": "orig",
+   "step": 4000,
+   "kl_4k": 0.7492850536687506,
+   "retrieval_acc": 0.0
+  },
+  {
+   "run": "orig",
+   "step": 6000,
+   "kl_4k": 0.7315545499893941,
+   "retrieval_acc": 0.03333333333333333
+  },
+  {
+   "run": "orig",
+   "step": 8000,
+   "kl_4k": 0.726232412025436,
+   "retrieval_acc": 0.13333333333333333
+  },
+  {
+   "run": "orig",
+   "step": 10000,
+   "kl_4k": 0.7430842610386511,
+   "retrieval_acc": 0.225
+  },
+  {
+   "run": "orig",
+   "step": 12000,
+   "kl_4k": 0.7468560960324895,
+   "retrieval_acc": 0.2375
+  },
+  {
+   "run": "cont",
+   "step": 2000,
+   "kl_4k": 0.7428324476091398,
+   "retrieval_acc": 0.18333333333333332
+  },
+  {
+   "run": "cont",
+   "step": 4000,
+   "kl_4k": 0.7726013550741805,
+   "retrieval_acc": 0.2125
+  },
+  {
+   "run": "cont",
+   "step": 6000,
+   "kl_4k": 0.7405615474433742,
+   "retrieval_acc": 0.2875
+  },
+  {
+   "run": "cont",
+   "step": 8000,
+   "kl_4k": 0.6930146072861842,
+   "retrieval_acc": 0.35833333333333334
+  },
+  {
+   "run": "cont",
+   "step": 10000,
+   "kl_4k": 0.6763562250804777,
+   "retrieval_acc": 0.4583333333333333
+  },
+  {
+   "run": "cont",
+   "step": 12000,
+   "kl_4k": 0.6526792202946834,
+   "retrieval_acc": 0.4708333333333333
+  }
+ ]
+}

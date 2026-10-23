@@ -1,0 +1,81 @@
+{
+ "meta": {
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "configs": [
+   "big",
+   "hyb"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r2_mix8k/projector.pt",
+   "configs": "big,hyb",
+   "speed_configs": "big,hyb,random:0.02,random:0.05,random:0.1,attn_small:0.05,attn_big:0.05,attn_big:0.05:b32,attn_big:0.05:sent,attn_small:0.05:sent",
+   "tasks": "speed",
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_qa": 50,
+   "speed_lengths": "4096,8192,16384,32768",
+   "speed_reps": 5,
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/recompute_speed",
+   "force": false,
+   "plot_only": false
+  },
+  "proj_step": 12000,
+  "time": "2026-10-14 03:33:51"
+ },
+ "speed": [
+  {
+   "prompt_len": 4096,
+   "big": 0.15517982188612223,
+   "hyb": 0.07387647870928049,
+   "random:0.02": 0.07634830195456743,
+   "random:0.05": 0.0831104451790452,
+   "random:0.1": 0.08693769294768572,
+   "attn_small:0.05": 0.08577602077275515,
+   "attn_big:0.05": 0.11103524640202522,
+   "attn_big:0.05:b32": 0.11208733078092337,
+   "attn_big:0.05:sent": 0.11248817667365074,
+   "attn_small:0.05:sent": 0.08680180180817842
+  },
+  {
+   "prompt_len": 8192,
+   "big": 0.337979088537395,
+   "hyb": 0.14156885538250208,
+   "random:0.02": 0.14563090912997723,
+   "random:0.05": 0.15786719042807817,
+   "random:0.1": 0.18873607646673918,
+   "attn_small:0.05": 0.1634307885542512,
+   "attn_big:0.05": 0.1987721584737301,
+   "attn_big:0.05:b32": 0.1994199426844716,
+   "attn_big:0.05:sent": 0.19977891352027655,
+   "attn_small:0.05:sent": 0.16447921842336655
+  },
+  {
+   "prompt_len": 16384,
+   "big": 0.7826463282108307,
+   "hyb": 0.3064332837238908,
+   "random:0.02": 0.3282984010875225,
+   "random:0.05": 0.3787867249920964,
+   "random:0.1": 0.47364688012748957,
+   "attn_small:0.05": 0.39025639556348324,
+   "attn_big:0.05": 0.445899723097682,
+   "attn_big:0.05:b32": 0.4468244267627597,
+   "attn_big:0.05:sent": 0.44791706558316946,
+   "attn_small:0.05:sent": 0.39156290888786316
+  },
+  {
+   "prompt_len": 32768,
+   "big": 2.035447472706437,
+   "hyb": 0.7635863842442632,
+   "random:0.02": 0.8809438776224852,
+   "random:0.05": 1.0464036036282778,
+   "random:0.1": 1.3271950064226985,
+   "attn_small:0.05": 1.0616845786571503,
+   "attn_big:0.05": 1.158941281028092,
+   "attn_big:0.05:b32": 1.1641537938266993,
+   "attn_big:0.05:sent": 1.1571591338142753,
+   "attn_small:0.05:sent": 1.065167160704732
+  }
+ ]
+}

@@ -1,0 +1,1016 @@
+{
+ "meta": {
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "args": {
+   "projectors": "stage1=/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/stage1/projector.pt,stage2=/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/stage2/projector.pt",
+   "n_sink": 8,
+   "n_tail": 64,
+   "variants": "16,128;4,32",
+   "tasks": "speed,ppl,oracle,niah,gsm8k",
+   "ppl_lengths": "512,1024,2048,3584",
+   "n_ppl": 40,
+   "n_oracle": 12,
+   "oracle_len": 2048,
+   "n_gsm8k": 150,
+   "gsm8k_shots": 5,
+   "gsm8k_max_new": 400,
+   "niah_lengths": "1024,2048,3584",
+   "n_niah": 30,
+   "speed_lengths": "512,1024,2048,4096",
+   "speed_repeats": 5,
+   "speed_decode_tokens": 32,
+   "out_dir": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/results/main"
+  },
+  "time": "2026-10-12 03:04"
+ },
+ "speed": [
+  {
+   "config": "big",
+   "prompt_len": 512,
+   "ttft_median_s": 0.025707588531076908,
+   "ttft_min_s": 0.02567395381629467,
+   "decode_per_token_s": 0.021739017363870516
+  },
+  {
+   "config": "small",
+   "prompt_len": 512,
+   "ttft_median_s": 0.01832662895321846,
+   "ttft_min_s": 0.018188887275755405,
+   "decode_per_token_s": 0.01589196323766373
+  },
+  {
+   "config": "hybrid_stage1_s8_t64",
+   "prompt_len": 512,
+   "ttft_median_s": 0.0836525447666645,
+   "ttft_min_s": 0.0823054788634181,
+   "decode_per_token_s": 0.022191440599272028,
+   "ttft_sink_s": 0.023982307873666286,
+   "ttft_small_s": 0.018483465537428856,
+   "ttft_projector_s": 0.0014743432402610779,
+   "ttft_kv_s": 0.010073772631585598,
+   "ttft_tail_s": 0.029578843154013157
+  },
+  {
+   "config": "hybrid_stage2_s8_t64",
+   "prompt_len": 512,
+   "ttft_median_s": 0.08350204583257437,
+   "ttft_min_s": 0.08267390727996826,
+   "decode_per_token_s": 0.022068037535063922,
+   "ttft_sink_s": 0.02376110665500164,
+   "ttft_small_s": 0.018672864884138107,
+   "ttft_projector_s": 0.001468399539589882,
+   "ttft_kv_s": 0.01026560366153717,
+   "ttft_tail_s": 0.029266217723488808
+  },
+  {
+   "config": "big",
+   "prompt_len": 1024,
+   "ttft_median_s": 0.040168299339711666,
+   "ttft_min_s": 0.04015320260077715,
+   "decode_per_token_s": 0.021504773787455633
+  },
+  {
+   "config": "small",
+   "prompt_len": 1024,
+   "ttft_median_s": 0.018177414312958717,
+   "ttft_min_s": 0.017853562720119953,
+   "decode_per_token_s": 0.01573324526543729
+  },
+  {
+   "config": "hybrid_stage1_s8_t64",
+   "prompt_len": 1024,
+   "ttft_median_s": 0.08533811289817095,
+   "ttft_min_s": 0.08455639518797398,
+   "decode_per_token_s": 0.022193489770870656,
+   "ttft_sink_s": 0.023968594148755074,
+   "ttft_small_s": 0.01884518191218376,
+   "ttft_projector_s": 0.0025888076052069664,
+   "ttft_kv_s": 0.010257910937070847,
+   "ttft_tail_s": 0.029345196671783924
+  },
+  {
+   "config": "hybrid_stage2_s8_t64",
+   "prompt_len": 1024,
+   "ttft_median_s": 0.0837392071262002,
+   "ttft_min_s": 0.08323437534272671,
+   "decode_per_token_s": 0.021904945984715596,
+   "ttft_sink_s": 0.023689374327659607,
+   "ttft_small_s": 0.018615550361573696,
+   "ttft_projector_s": 0.0025864653289318085,
+   "ttft_kv_s": 0.010167373344302177,
+   "ttft_tail_s": 0.028774598613381386
+  },
+  {
+   "config": "big",
+   "prompt_len": 2048,
+   "ttft_median_s": 0.07750672474503517,
+   "ttft_min_s": 0.07742531411349773,
+   "decode_per_token_s": 0.0215684435388539
+  },
+  {
+   "config": "small",
+   "prompt_len": 2048,
+   "ttft_median_s": 0.01857386715710163,
+   "ttft_min_s": 0.018540682271122932,
+   "decode_per_token_s": 0.015626445558154956
+  },
+  {
+   "config": "hybrid_stage1_s8_t64",
+   "prompt_len": 2048,
+   "ttft_median_s": 0.08963211625814438,
+   "ttft_min_s": 0.08868227526545525,
+   "decode_per_token_s": 0.02197877984144725,
+   "ttft_sink_s": 0.023883881978690624,
+   "ttft_small_s": 0.019513134844601154,
+   "ttft_projector_s": 0.00490152183920145,
+   "ttft_kv_s": 0.011919294483959675,
+   "ttft_tail_s": 0.02927506063133478
+  },
+  {
+   "config": "hybrid_stage2_s8_t64",
+   "prompt_len": 2048,
+   "ttft_median_s": 0.08982001710683107,
+   "ttft_min_s": 0.08905281778424978,
+   "decode_per_token_s": 0.022423053305828944,
+   "ttft_sink_s": 0.023725303821265697,
+   "ttft_small_s": 0.019524991512298584,
+   "ttft_projector_s": 0.004904099740087986,
+   "ttft_kv_s": 0.012021354399621487,
+   "ttft_tail_s": 0.02968406304717064
+  },
+  {
+   "config": "big",
+   "prompt_len": 4096,
+   "ttft_median_s": 0.1555304303765297,
+   "ttft_min_s": 0.1552884839475155,
+   "decode_per_token_s": 0.021809963829582557
+  },
+  {
+   "config": "small",
+   "prompt_len": 4096,
+   "ttft_median_s": 0.035378724336624146,
+   "ttft_min_s": 0.03531451802700758,
+   "decode_per_token_s": 0.015611749811796471
+  },
+  {
+   "config": "hybrid_stage1_s8_t64",
+   "prompt_len": 4096,
+   "ttft_median_s": 0.12101259548217058,
+   "ttft_min_s": 0.12039733491837978,
+   "decode_per_token_s": 0.021735061571234837,
+   "ttft_sink_s": 0.024042611941695213,
+   "ttft_small_s": 0.0373858455568552,
+   "ttft_projector_s": 0.009577769786119461,
+   "ttft_kv_s": 0.020680058747529984,
+   "ttft_tail_s": 0.029281889088451862
+  },
+  {
+   "config": "hybrid_stage2_s8_t64",
+   "prompt_len": 4096,
+   "ttft_median_s": 0.12109487969428301,
+   "ttft_min_s": 0.12085793819278479,
+   "decode_per_token_s": 0.021952047012746334,
+   "ttft_sink_s": 0.024159790948033333,
+   "ttft_small_s": 0.03739685192704201,
+   "ttft_projector_s": 0.009577995166182518,
+   "ttft_kv_s": 0.020693455822765827,
+   "ttft_tail_s": 0.02916941326111555
+  }
+ ],
+ "ppl": [
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 512,
+   "config": "big",
+   "n": 40,
+   "nll": 2.3525809824466704,
+   "kl_vs_big": 0.0,
+   "top1_agree": 1.0,
+   "ppl": 10.51266860961914
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 512,
+   "config": "small",
+   "n": 40,
+   "nll": 2.981406509876251,
+   "kl_vs_big": 0.7807700619101524,
+   "top1_agree": 0.6341796875,
+   "ppl": 19.715526580810547
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 512,
+   "config": "hybrid_stage1_s8_t64",
+   "n": 40,
+   "nll": 2.4861346006393434,
+   "kl_vs_big": 0.17454381491988896,
+   "top1_agree": 0.84208984375,
+   "ppl": 12.01474380493164
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 512,
+   "config": "hybrid_stage2_s8_t64",
+   "n": 40,
+   "nll": 2.3915345698595045,
+   "kl_vs_big": 0.07289067474193871,
+   "top1_agree": 0.887890625,
+   "ppl": 10.930253982543945
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 512,
+   "config": "hybrid_stage2_s16_t128",
+   "n": 40,
+   "nll": 2.3716105341911318,
+   "kl_vs_big": 0.05092746391892433,
+   "top1_agree": 0.90634765625,
+   "ppl": 10.714635848999023
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 512,
+   "config": "hybrid_stage2_s4_t32",
+   "n": 40,
+   "nll": 2.403675988316536,
+   "kl_vs_big": 0.0917364165186882,
+   "top1_agree": 0.87705078125,
+   "ppl": 11.063772201538086
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 1024,
+   "config": "big",
+   "n": 40,
+   "nll": 2.2980656385421754,
+   "kl_vs_big": 0.0,
+   "top1_agree": 1.0,
+   "ppl": 9.954907417297363
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 1024,
+   "config": "small",
+   "n": 40,
+   "nll": 2.9603210419416426,
+   "kl_vs_big": 0.8112711198627949,
+   "top1_agree": 0.6337890625,
+   "ppl": 19.304166793823242
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 1024,
+   "config": "hybrid_stage1_s8_t64",
+   "n": 40,
+   "nll": 2.4566073268651962,
+   "kl_vs_big": 0.18927304102107884,
+   "top1_agree": 0.83798828125,
+   "ppl": 11.665168762207031
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 1024,
+   "config": "hybrid_stage2_s8_t64",
+   "n": 40,
+   "nll": 2.350784432888031,
+   "kl_vs_big": 0.08389285132288933,
+   "top1_agree": 0.88447265625,
+   "ppl": 10.493799209594727
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 1024,
+   "config": "hybrid_stage2_s16_t128",
+   "n": 40,
+   "nll": 2.338990354537964,
+   "kl_vs_big": 0.06700460356660187,
+   "top1_agree": 0.89599609375,
+   "ppl": 10.37076187133789
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 1024,
+   "config": "hybrid_stage2_s4_t32",
+   "n": 40,
+   "nll": 2.3656097769737245,
+   "kl_vs_big": 0.10113432072103024,
+   "top1_agree": 0.8705078125,
+   "ppl": 10.650532722473145
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 2048,
+   "config": "big",
+   "n": 40,
+   "nll": 2.2864585354924203,
+   "kl_vs_big": 0.0,
+   "top1_agree": 1.0,
+   "ppl": 9.840027809143066
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 2048,
+   "config": "small",
+   "n": 40,
+   "nll": 2.9026551365852358,
+   "kl_vs_big": 0.7752220399677754,
+   "top1_agree": 0.64111328125,
+   "ppl": 18.222463607788086
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 2048,
+   "config": "hybrid_stage1_s8_t64",
+   "n": 40,
+   "nll": 2.4943219423294067,
+   "kl_vs_big": 0.23833128549158572,
+   "top1_agree": 0.82431640625,
+   "ppl": 12.113515853881836
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 2048,
+   "config": "hybrid_stage2_s8_t64",
+   "n": 40,
+   "nll": 2.350848896801472,
+   "kl_vs_big": 0.1068011567927897,
+   "top1_agree": 0.8666015625,
+   "ppl": 10.494474411010742
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 2048,
+   "config": "hybrid_stage2_s16_t128",
+   "n": 40,
+   "nll": 2.335851389169693,
+   "kl_vs_big": 0.08711520116776228,
+   "top1_agree": 0.87958984375,
+   "ppl": 10.338258743286133
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 2048,
+   "config": "hybrid_stage2_s4_t32",
+   "n": 40,
+   "nll": 2.3673949003219605,
+   "kl_vs_big": 0.12416454749181867,
+   "top1_agree": 0.85703125,
+   "ppl": 10.669561386108398
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 3584,
+   "config": "big",
+   "n": 30,
+   "nll": 2.1747876127560932,
+   "kl_vs_big": 0.0,
+   "top1_agree": 1.0,
+   "ppl": 8.800314903259277
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 3584,
+   "config": "small",
+   "n": 30,
+   "nll": 2.890120275815328,
+   "kl_vs_big": 0.843490692973137,
+   "top1_agree": 0.6393229166666666,
+   "ppl": 17.995473861694336
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 3584,
+   "config": "hybrid_stage1_s8_t64",
+   "n": 30,
+   "nll": 2.4227553486824034,
+   "kl_vs_big": 0.2940222046027581,
+   "top1_agree": 0.8201822916666667,
+   "ppl": 11.276886940002441
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 3584,
+   "config": "hybrid_stage2_s8_t64",
+   "n": 30,
+   "nll": 2.2669820408026378,
+   "kl_vs_big": 0.14253594453136126,
+   "top1_agree": 0.8640625,
+   "ppl": 9.650233268737793
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 3584,
+   "config": "hybrid_stage2_s16_t128",
+   "n": 30,
+   "nll": 2.251976710557938,
+   "kl_vs_big": 0.12547171643624702,
+   "top1_agree": 0.8740885416666667,
+   "ppl": 9.506508827209473
+  },
+  {
+   "source": "fineweb_edu",
+   "prompt_len": 3584,
+   "config": "hybrid_stage2_s4_t32",
+   "n": 30,
+   "nll": 2.2830076932907106,
+   "kl_vs_big": 0.157762577633063,
+   "top1_agree": 0.85859375,
+   "ppl": 9.806129455566406
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 512,
+   "config": "big",
+   "n": 40,
+   "nll": 2.304748420417309,
+   "kl_vs_big": 0.0,
+   "top1_agree": 1.0,
+   "ppl": 10.021657943725586
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 512,
+   "config": "small",
+   "n": 40,
+   "nll": 3.0020702362060545,
+   "kl_vs_big": 0.8750935412943364,
+   "top1_agree": 0.619140625,
+   "ppl": 20.127161026000977
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 512,
+   "config": "hybrid_stage1_s8_t64",
+   "n": 40,
+   "nll": 2.4934234023094177,
+   "kl_vs_big": 0.23739321790635587,
+   "top1_agree": 0.8265625,
+   "ppl": 12.102638244628906
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 512,
+   "config": "hybrid_stage2_s8_t64",
+   "n": 40,
+   "nll": 2.371903362870216,
+   "kl_vs_big": 0.10674681761302054,
+   "top1_agree": 0.87119140625,
+   "ppl": 10.7177734375
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 512,
+   "config": "hybrid_stage2_s16_t128",
+   "n": 40,
+   "nll": 2.347314988076687,
+   "kl_vs_big": 0.07604343984276056,
+   "top1_agree": 0.891796875,
+   "ppl": 10.457454681396484
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 512,
+   "config": "hybrid_stage2_s4_t32",
+   "n": 40,
+   "nll": 2.394295926392078,
+   "kl_vs_big": 0.12555921860039235,
+   "top1_agree": 0.85859375,
+   "ppl": 10.960478782653809
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 1024,
+   "config": "big",
+   "n": 40,
+   "nll": 2.3679204121232034,
+   "kl_vs_big": 0.0,
+   "top1_agree": 1.0,
+   "ppl": 10.675168991088867
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 1024,
+   "config": "small",
+   "n": 40,
+   "nll": 3.022978053987026,
+   "kl_vs_big": 0.8255872055888176,
+   "top1_agree": 0.63134765625,
+   "ppl": 20.552406311035156
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 1024,
+   "config": "hybrid_stage1_s8_t64",
+   "n": 40,
+   "nll": 2.6135141998529434,
+   "kl_vs_big": 0.30048540215939284,
+   "top1_agree": 0.79970703125,
+   "ppl": 13.64692497253418
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 1024,
+   "config": "hybrid_stage2_s8_t64",
+   "n": 40,
+   "nll": 2.4643657386302946,
+   "kl_vs_big": 0.12036076849326491,
+   "top1_agree": 0.86357421875,
+   "ppl": 11.756023406982422
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 1024,
+   "config": "hybrid_stage2_s16_t128",
+   "n": 40,
+   "nll": 2.4450440287590025,
+   "kl_vs_big": 0.10027491259388625,
+   "top1_agree": 0.87666015625,
+   "ppl": 11.531057357788086
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 1024,
+   "config": "hybrid_stage2_s4_t32",
+   "n": 40,
+   "nll": 2.478181155025959,
+   "kl_vs_big": 0.1370678348466754,
+   "top1_agree": 0.85244140625,
+   "ppl": 11.919564247131348
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 2048,
+   "config": "big",
+   "n": 40,
+   "nll": 2.261822756752372,
+   "kl_vs_big": 0.0,
+   "top1_agree": 1.0,
+   "ppl": 9.60057258605957
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 2048,
+   "config": "small",
+   "n": 40,
+   "nll": 2.877501505240798,
+   "kl_vs_big": 0.7968720644712448,
+   "top1_agree": 0.6482421875,
+   "ppl": 17.769819259643555
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 2048,
+   "config": "hybrid_stage1_s8_t64",
+   "n": 40,
+   "nll": 2.5579052649438383,
+   "kl_vs_big": 0.3518367873504758,
+   "top1_agree": 0.79736328125,
+   "ppl": 12.908747673034668
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 2048,
+   "config": "hybrid_stage2_s8_t64",
+   "n": 40,
+   "nll": 2.361049880087376,
+   "kl_vs_big": 0.14221400059759617,
+   "top1_agree": 0.859765625,
+   "ppl": 10.602076530456543
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 2048,
+   "config": "hybrid_stage2_s16_t128",
+   "n": 40,
+   "nll": 2.341634886339307,
+   "kl_vs_big": 0.1177853582892567,
+   "top1_agree": 0.8740234375,
+   "ppl": 10.398223876953125
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 2048,
+   "config": "hybrid_stage2_s4_t32",
+   "n": 40,
+   "nll": 2.380995790660381,
+   "kl_vs_big": 0.16467962744645775,
+   "top1_agree": 0.851171875,
+   "ppl": 10.815667152404785
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 3584,
+   "config": "big",
+   "n": 34,
+   "nll": 2.152513692265048,
+   "kl_vs_big": 0.0,
+   "top1_agree": 1.0,
+   "ppl": 8.606465339660645
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 3584,
+   "config": "small",
+   "n": 34,
+   "nll": 2.732573028872995,
+   "kl_vs_big": 0.7237318998531383,
+   "top1_agree": 0.6677389705882353,
+   "ppl": 15.372389793395996
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 3584,
+   "config": "hybrid_stage1_s8_t64",
+   "n": 34,
+   "nll": 2.5284263333853554,
+   "kl_vs_big": 0.4390648502637358,
+   "top1_agree": 0.7726332720588235,
+   "ppl": 12.533767700195312
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 3584,
+   "config": "hybrid_stage2_s8_t64",
+   "n": 34,
+   "nll": 2.290391640189816,
+   "kl_vs_big": 0.19943125261103406,
+   "top1_agree": 0.8365119485294118,
+   "ppl": 9.878806114196777
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 3584,
+   "config": "hybrid_stage2_s16_t128",
+   "n": 34,
+   "nll": 2.2685180389705826,
+   "kl_vs_big": 0.17406845476259203,
+   "top1_agree": 0.8485753676470589,
+   "ppl": 9.665066719055176
+  },
+  {
+   "source": "slimpajama",
+   "prompt_len": 3584,
+   "config": "hybrid_stage2_s4_t32",
+   "n": 34,
+   "nll": 2.311913586276419,
+   "kl_vs_big": 0.21772667261607506,
+   "top1_agree": 0.8267463235294118,
+   "ppl": 10.093720436096191
+  }
+ ],
+ "oracle": {
+  "stage1": {
+   "n": 12,
+   "prompt_len": 2048,
+   "kl_none_projected": 0.0007189728348748758,
+   "kl_all_projected_no_tail": 0.45823974659045535,
+   "kl_per_layer": {
+    "0": 0.0009613727209701514,
+    "1": 0.0009820524622530986,
+    "2": 0.0015401735775715981,
+    "3": 0.0018202082040564467,
+    "4": 0.0015561406520040084,
+    "5": 0.0013711151550523937,
+    "6": 0.001383211701371086,
+    "7": 0.0014701383382392426,
+    "8": 0.0015407467726618052,
+    "9": 0.004407399867583687,
+    "10": 0.001698221531114541,
+    "11": 0.0016123385770091165,
+    "12": 0.002266489939453701,
+    "13": 0.003632137978759905,
+    "14": 0.002298504967863361,
+    "15": 0.004503020056290552,
+    "16": 0.0030918472912162542,
+    "17": 0.008121705963276327,
+    "18": 0.0053678426969175535,
+    "19": 0.004849056839399661,
+    "20": 0.0062069311970844865,
+    "21": 0.004545867016228537,
+    "22": 0.007567035790998489,
+    "23": 0.005548104828145976,
+    "24": 0.006753918540198356,
+    "25": 0.0019541291549103335,
+    "26": 0.003461063577560708,
+    "27": 0.003067719614288459,
+    "28": 0.0017824488216623042,
+    "29": 0.003860090752520288,
+    "30": 0.002312269246128077,
+    "31": 0.002879589000561585,
+    "32": 0.0033708528499118984,
+    "33": 0.007369049029269566,
+    "34": 0.007452963570055242,
+    "35": 0.0018740463419817388
+   }
+  },
+  "stage2": {
+   "n": 12,
+   "prompt_len": 2048,
+   "kl_none_projected": 0.0007189728348748758,
+   "kl_all_projected_no_tail": 0.20199696657558283,
+   "kl_per_layer": {
+    "0": 0.0018217360144869115,
+    "1": 0.0015196704140786703,
+    "2": 0.002181263960665092,
+    "3": 0.0030112968621930727,
+    "4": 0.0024123147498661033,
+    "5": 0.002794639983524879,
+    "6": 0.0020968379685655236,
+    "7": 0.0017873926844913512,
+    "8": 0.00202657780998076,
+    "9": 0.0041865749808494,
+    "10": 0.0018164481734856963,
+    "11": 0.0019567756971810013,
+    "12": 0.003074086610771095,
+    "13": 0.003868276757809023,
+    "14": 0.0027223534998483956,
+    "15": 0.005244631339640667,
+    "16": 0.0038719414345299206,
+    "17": 0.007707792101427913,
+    "18": 0.004655295536698152,
+    "19": 0.005757386699163665,
+    "20": 0.006120302442771693,
+    "21": 0.005611483803174148,
+    "22": 0.007818733380797008,
+    "23": 0.004760119869994621,
+    "24": 0.006002105229223768,
+    "25": 0.00274341952172108,
+    "26": 0.003730582141239817,
+    "27": 0.0032498476017887392,
+    "28": 0.0026825041180321327,
+    "29": 0.004189701052382588,
+    "30": 0.0018639638922953357,
+    "31": 0.003295502809730048,
+    "32": 0.0024150333968767277,
+    "33": 0.005180246875776599,
+    "34": 0.005737284033481653,
+    "35": 0.0024490092667595795
+   }
+  }
+ },
+ "niah": [
+  {
+   "config": "big",
+   "target_len": 1024,
+   "mean_prompt_tokens": 991.9,
+   "n": 30,
+   "accuracy": 1.0,
+   "mean_ttft_s": 0.04007691719258825
+  },
+  {
+   "config": "big",
+   "target_len": 2048,
+   "mean_prompt_tokens": 2015.9333333333334,
+   "n": 30,
+   "accuracy": 1.0,
+   "mean_ttft_s": 0.07772249005114039
+  },
+  {
+   "config": "big",
+   "target_len": 3584,
+   "mean_prompt_tokens": 3551.9,
+   "n": 30,
+   "accuracy": 1.0,
+   "mean_ttft_s": 0.13705483293160797
+  },
+  {
+   "config": "small",
+   "target_len": 1024,
+   "mean_prompt_tokens": 991.9,
+   "n": 30,
+   "accuracy": 1.0,
+   "mean_ttft_s": 0.01825170482819279
+  },
+  {
+   "config": "small",
+   "target_len": 2048,
+   "mean_prompt_tokens": 2015.9333333333334,
+   "n": 30,
+   "accuracy": 1.0,
+   "mean_ttft_s": 0.01882746381064256
+  },
+  {
+   "config": "small",
+   "target_len": 3584,
+   "mean_prompt_tokens": 3551.9,
+   "n": 30,
+   "accuracy": 1.0,
+   "mean_ttft_s": 0.031061179966976247
+  },
+  {
+   "config": "hybrid_stage1_s8_t64",
+   "target_len": 1024,
+   "mean_prompt_tokens": 991.9,
+   "n": 30,
+   "accuracy": 0.0,
+   "mean_ttft_s": 0.08432306228205562
+  },
+  {
+   "config": "hybrid_stage1_s8_t64",
+   "target_len": 2048,
+   "mean_prompt_tokens": 2015.9333333333334,
+   "n": 30,
+   "accuracy": 0.0,
+   "mean_ttft_s": 0.08883485381181042
+  },
+  {
+   "config": "hybrid_stage1_s8_t64",
+   "target_len": 3584,
+   "mean_prompt_tokens": 3551.9,
+   "n": 30,
+   "accuracy": 0.0,
+   "mean_ttft_s": 0.11255403403192758
+  },
+  {
+   "config": "hybrid_stage2_s8_t64",
+   "target_len": 1024,
+   "mean_prompt_tokens": 991.9,
+   "n": 30,
+   "accuracy": 0.4666666666666667,
+   "mean_ttft_s": 0.08397562177851796
+  },
+  {
+   "config": "hybrid_stage2_s8_t64",
+   "target_len": 2048,
+   "mean_prompt_tokens": 2015.9333333333334,
+   "n": 30,
+   "accuracy": 0.6333333333333333,
+   "mean_ttft_s": 0.08882867737362782
+  },
+  {
+   "config": "hybrid_stage2_s8_t64",
+   "target_len": 3584,
+   "mean_prompt_tokens": 3551.9,
+   "n": 30,
+   "accuracy": 0.7,
+   "mean_ttft_s": 0.11246011968081196
+  },
+  {
+   "config": "hybrid_stage2_s16_t128",
+   "target_len": 1024,
+   "mean_prompt_tokens": 991.9,
+   "n": 30,
+   "accuracy": 0.5,
+   "mean_ttft_s": 0.08508461176728209
+  },
+  {
+   "config": "hybrid_stage2_s16_t128",
+   "target_len": 2048,
+   "mean_prompt_tokens": 2015.9333333333334,
+   "n": 30,
+   "accuracy": 0.6,
+   "mean_ttft_s": 0.08932722310225169
+  },
+  {
+   "config": "hybrid_stage2_s16_t128",
+   "target_len": 3584,
+   "mean_prompt_tokens": 3551.9,
+   "n": 30,
+   "accuracy": 0.6666666666666666,
+   "mean_ttft_s": 0.11762329740449787
+  },
+  {
+   "config": "hybrid_stage2_s4_t32",
+   "target_len": 1024,
+   "mean_prompt_tokens": 991.9,
+   "n": 30,
+   "accuracy": 0.5,
+   "mean_ttft_s": 0.08474667115757863
+  },
+  {
+   "config": "hybrid_stage2_s4_t32",
+   "target_len": 2048,
+   "mean_prompt_tokens": 2015.9333333333334,
+   "n": 30,
+   "accuracy": 0.6,
+   "mean_ttft_s": 0.08870235461120804
+  },
+  {
+   "config": "hybrid_stage2_s4_t32",
+   "target_len": 3584,
+   "mean_prompt_tokens": 3551.9,
+   "n": 30,
+   "accuracy": 0.7333333333333333,
+   "mean_ttft_s": 0.11189674967899918
+  }
+ ],
+ "gsm8k": [
+  {
+   "config": "big",
+   "n": 150,
+   "accuracy": 0.94,
+   "mean_prompt_tokens": 1353.0933333333332,
+   "mean_ttft_s": 0.05491727799798052,
+   "mean_total_s": 3.177458087373525,
+   "mean_new_tokens": 141.67333333333335,
+   "samples": [
+    {
+     "q": "Janet\u2019s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?",
+     "gold": 18.0,
+     "pred": 18.0,
+     "output": "Janet\u2019s ducks lay 16 eggs per day.  \nShe uses 3 eggs for breakfast and 4 eggs for muffins, so she uses a total of 3 + 4 = <<3+4=7>>7 eggs.  \nThis leaves 16 - 7 = <<16-7=9>>9 eggs for sale at the farmers' market.  \nShe sells each egg for $2, so her daily earnings are 9 \u00d7 $2 = <<9*2=18>>$18.  \n#### 18"
+    },
+    {
+     "q": "A robe takes 2 bolts of blue fiber and half that much white fiber.  How many bolts in total does it take?",
+     "gold": 3.0,
+     "pred": 3.0,
+     "output": "A robe takes 2 bolts of blue fiber and half that much white fiber. Half of 2 bolts is 1 bolt.  \nSo, the total number of bolts needed is 2 (blue) + 1 (white) = <<2+1=3>>3 bolts.  \n#### 3"
+    },
+    {
+     "q": "Josh decides to try flipping a house.  He buys a house for $80,000 and then puts in $50,000 in repairs.  This increased the value of the house by 150%.  How much profit did he make?",
+     "gold": 70000.0,
+     "pred": 70000.0,
+     "output": "Josh bought the house for $80,000 and spent $50,000 on repairs, so his total investment was $80,000 + $50,000 = $130,000.  \nThe value of the house increased by 150%, so the increase in value is 150% of the original value of the house, which was $80,000.  \nThe increase in value is $80,000 \u00d7 1.50 = $120,000.  \nThe new value of the house is $80,000 + $120,000 = $200,000.  \nJosh's profit is the new value of the house minus his total investment: $200,000 - $130,000 = $70,000.  \n#### 70000"
+    }
+   ]
+  },
+  {
+   "config": "small",
+   "n": 150,
+   "accuracy": 0.1,
+   "mean_prompt_tokens": 1353.0933333333332,
+   "mean_ttft_s": 0.01836760819579164,
+   "mean_total_s": 1.2030731727431219,
+   "mean_new_tokens": 74.74666666666667,
+   "samples": [
+    {
+     "q": "Janet\u2019s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?",
+     "gold": 18.0,
+     "pred": 4.0,
+     "output": "3.79 + 4.5 + 3.95 + 3.09 + 4.67 = <<3.79+4.5+3.95+3.09+4.67=20>>20 inches  \n20 / 5 = <<20/5=4>>4 inches of rain per month  \n#### 4"
+    },
+    {
+     "q": "A robe takes 2 bolts of blue fiber and half that much white fiber.  How many bolts in total does it take?",
+     "gold": 3.0,
+     "pred": 4.0,
+     "output": "3.79 + 4.5 + 3.95 + 3.09 + 4.67 = <<3.79+4.5+3.95+3.09+4.67=20>>20  \n20 / 5 = <<20/5=4>>4  \n#### 4"
+    },
+    {
+     "q": "Josh decides to try flipping a house.  He buys a house for $80,000 and then puts in $50,000 in repairs.  This increased the value of the house by 150%.  How much profit did he make?",
+     "gold": 70000.0,
+     "pred": 4.0,
+     "output": "3.79 + 4.5 + 3.95 + 3.09 + 4.67 = 20 inches  \n20 / 5 = 4 inches per month  \n#### 4"
+    }
+   ]
+  },
+  {
+   "config": "hybrid_stage1_s8_t64",
+   "n": 150,
+   "accuracy": 0.7,
+   "mean_prompt_tokens": 1353.0933333333332,
+   "mean_ttft_s": 0.08481117921570937,
+   "mean_total_s": 5.033864970430732,
+   "mean_new_tokens": 219.5,
+   "samples": [
+    {
+     "q": "Janet\u2019s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?",
+     "gold": 18.0,
+     "pred": 18.0,
+     "output": "Let's break down the problem step by step:\n\n1. **Total number of eggs laid per day**: 16  \n2. **Eggs eaten by her for breakfast**: 3  \n3. **Eggs used for muffins**: 4  \n4. **Eggs left for the farmers' market**:  \n   $$\n   16 - 3 - 4 = 9\n   $$\n5. **Price per egg at the farmers' market**: $2  \n6. **Total earnings from the farmers' market**:  \n   $$\n   9 \\times 2 = 18\n   $$\n\n**Answer: $18**"
+    },
+    {
+     "q": "A robe takes 2 bolts of blue fiber and half that much white fiber.  How many bolts in total does it take?",
+     "gold": 3.0,
+     "pred": 3.0,
+     "output": "The robe takes 2 bolts of blue fiber and half that much white fiber. Half of 2 bolts is 1 bolt. So, the total number of bolts needed is:\n\n$$\n2 \\text{ (blue)} + 1 \\text{ (white)} = 3 \\text{ bolts}\n$$\n\n**Answer: 3 bolts**"
+    },
+    {
+     "q": "Josh decides to try flipping a house.  He buys a house for $80,000 and then puts in $50,000 in repairs.  This increased the value of the house by 150%.  How much profit did he make?",
+     "gold": 70000.0,
+     "pred": 70000.0,
+     "output": "To calculate the profit that **Josh** made from flipping the house, we need to follow these steps:\n\n---\n\n### **Step 1: Calculate the total cost of the house**\n- **Purchase price**: $80,000  \n- **Repair cost**: $50,000  \n- **Total cost** = $80,000 + $50,000 = **$130,000**\n\n---\n\n### **Step 2: Calculate the increased value of the house**\n- The value of the house increased by **150%**.\n- **150% of $80,000** = $80,000 \u00d7 1.5 = **$120,000**\n- **New value of the house** = Original value + Increase = $80,000 + $120,000 = **$200,000**\n\n---\n\n### **Step 3: Calculate the profit**\n- **Profit** = New value of the house - Total cost  \n- **Profit** = $200,000 - $130,000 = **$70,000**\n\n---\n\n### \u2705 **Final Answer:**\n**$70,000**"
+    }
+   ]
+  },
+  {
+   "config": "hybrid_stage2_s8_t64",
+   "n": 150,
+   "accuracy": 0.9,
+   "mean_prompt_tokens": 1353.0933333333332,
+   "mean_ttft_s": 0.08501507860297958,
+   "mean_total_s": 4.200031595863402,
+   "mean_new_tokens": 182.28666666666666,
+   "samples": [
+    {
+     "q": "Janet\u2019s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?",
+     "gold": 18.0,
+     "pred": 18.0,
+     "output": "Let's break down the problem step by step:\n\n1. **Total eggs laid per day**: 16  \n2. **Eggs eaten for breakfast**: 3  \n3. **Eggs used for muffins**: 4  \n4. **Eggs left for sale**:  \n   $ 16 - 3 - 4 = 9 $ eggs  \n\n5. **Price per egg at the farmers' market**: $2  \n\n6. **Total money made per day**:  \n   $ 9 \\times 2 = 18 $ dollars  \n\n**Answer: $18**"
+    },
+    {
+     "q": "A robe takes 2 bolts of blue fiber and half that much white fiber.  How many bolts in total does it take?",
+     "gold": 3.0,
+     "pred": 3.0,
+     "output": "A robe takes 2 bolts of blue fiber and half that much white fiber. Half of 2 is 1. So, it takes 2 + 1 = 3 bolts in total.\n\n#### 3"
+    },
+    {
+     "q": "Josh decides to try flipping a house.  He buys a house for $80,000 and then puts in $50,000 in repairs.  This increased the value of the house by 150%.  How much profit did he make?",
+     "gold": 70000.0,
+     "pred": 70000.0,
+     "output": "To find the profit, we need to calculate the total cost and the final value of the house.\n\n1. **Initial cost of the house**: $80,000  \n2. **Cost of repairs**: $50,000  \n3. **Total cost**: $80,000 + $50,000 = **$130,000**\n\nThe repairs increased the value of the house by **150%**.  \nSo, the increase in value is:  \n150% of $80,000 = $1.5 \u00d7 $80,000 = **$120,000**\n\nNow, the **final value** of the house is:  \n$80,000 (original value) + $120,000 (increase) = **$200,000**\n\n**Profit** = Final value - Total cost  \n= $200,000 - $130,000 = **$70,000**\n\n**Answer: $70,000**"
+    }
+   ]
+  }
+ ]
+}
