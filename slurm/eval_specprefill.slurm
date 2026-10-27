@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=pf_spec
 #SBATCH --account=drjieliu
-#SBATCH --partition=drjieliu-l40s,drjieliu-h100
+#SBATCH --partition=drjieliu-l40s
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
@@ -11,7 +11,7 @@
 #SBATCH --output=/nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM/logs/%x-%j.out
 #SBATCH --mail-user=shengkai@umich.edu
 #SBATCH --mail-type=END,FAIL
-# SpecPrefill baseline vs our projected fill, on ONE GPU (L40S or H100), no training.
+# SpecPrefill baseline vs our projected fill, on ONE L40S GPU, no training.
 # For each small model (0.6B r2_mix8k projector, 1.7B r5_s17_normB projector; the same small model is SpecPrefill's speculator):
 #   ours      attn_small:{5,10,20}%:sent             recompute chosen middle sentences, projected KV for the rest
 #   drop      drop-attn_small:{5,10,20}%:sent        identical selection, the rest DROPPED (controlled ablation)

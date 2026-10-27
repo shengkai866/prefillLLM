@@ -6,6 +6,8 @@ Configs:  big (8B alone) | small (small model alone) | hyb (hybrid, nothing reco
           <scorer>:<fraction of middle tokens>[:<unit>]        recompute, the other middle tokens get projected KV
           drop-<scorer>:<fraction of middle tokens>[:<unit>]   same selection, the other middle tokens are DROPPED
           specprefill:<fraction of the whole prompt>[:lahN]    SpecPrefill baseline (official defaults, look-ahead 8)
+          rarecache:<fraction of the whole prompt>             RaReCache baseline (ridge-mapped cache + rank-disagreement
+                                                               recompute; needs --rarecache_fit from scripts/fit_rarecache.py)
           scorer: attn_small | attn_big | spec (SpecPrefill importance) | random | recent
           unit: omitted = single tokens (max-pooled scores; spec: 32-token chunks) | bN = fixed blocks of N tokens |
                 sent = sentence/line segments
@@ -13,7 +15,7 @@ Tasks (stored in results.json as each finishes; finished tasks are skipped on re
   ruler    RULER 4096 / 8192, 13 tasks, same examples as round 2 (same seeds)
   qa       SQuAD v2 / HotpotQA / TriviaQA at ~3.5k / ~7.5k tokens (first n of the round-2 pool)
   niah     round-1 passcode needle at 2048 / 3584 / 7680
-  speed    TTFT (eager fast path, H100) vs prompt length for big, hyb and the recompute configs
+  speed    TTFT (eager fast path) vs prompt length for big, hyb and the recompute configs
   gsm8k    GSM8K 8-shot as chat turns (same prompts as scripts/evaluate_v2.py), any config incl. recompute
   code     next-line completion on held-out repositories (same pool as scripts/evaluate_v2.py)
 Every generation is written to generations.jsonl for error analysis.
@@ -37,6 +39,7 @@ from prefill.kv import greedy_decode, split_prompt, true_prefill  # noqa: E402
 from prefill.mixdata import PromptPool, Tok  # noqa: E402
 from prefill.models import eos_ids, load_pair  # noqa: E402
 from prefill.projector import Projector  # noqa: E402
+from prefill.rarecache import RaReCache  # noqa: E402
 from prefill.recompute import RecomputeHybrid  # noqa: E402
 
 FRACS = (0.02, 0.05, 0.1, 0.2)
@@ -72,13 +75,15 @@ def label(cfg):
         return SCORER_ZH["oracle"]
     if s == "specprefill":
         return f"SpecPrefill 保留整段 {f:.0%}" + (f"，{unit_zh(u)}" if u is not None else "")
+    if s == "rarecache":
+        return f"RaReCache 重算整段 {f:.0%}"
     if s.startswith("drop-"):
         return f"丢弃其余（不投影）：{SCORER_ZH[s[5:]]} {f:.0%}" + (f"，{unit_zh(u)}" if u is not None else "")
     return f"{SCORER_ZH[s]} {f:.0%}" + (f"，{unit_zh(u)}" if u is not None else "")
 
 
 class Engine:
-    def __init__(self, tok, small, large, proj_path, dev, n_sink, n_tail):
+    def __init__(self, tok, small, large, proj_path, dev, n_sink, n_tail, rarecache_fit=None):
         self.tok, self.small, self.large, self.dev = tok, small, large, dev
         self.T = Tok(tok)
         self.S, self.L = FastQwen3(small), FastQwen3(large)
@@ -91,6 +96,7 @@ class Engine:
         self.eos = eos_ids(tok)
         self.rh = RecomputeHybrid(self.S, self.L, FoldedProjectorKV(p, self.L), n_sink=n_sink, n_tail=n_tail, boundary=boundary,
                                   eos=self.eos)
+        self.rc = RaReCache(self.S, self.L, torch.load(rarecache_fit, map_location="cpu")) if rarecache_fit else None
 
     def needles(self, answers):
         out = []
@@ -113,6 +119,9 @@ class Engine:
             return (*self.rh.prefill(ids), 0.0)
         if s == "specprefill":
             kb, vb, lg, n = self.rh.prefill_specprefill(ids, f, n_lah=int(u[3:]) if u else None)
+            return kb, vb, lg, n / ids.shape[0]
+        if s == "rarecache":
+            kb, vb, lg, n = self.rc.prefill(ids, f)
             return kb, vb, lg, n / ids.shape[0]
         kb, vb, lg, n = self.rh.prefill_sel(ids, s.removeprefix("drop-"), f, needles=self.needles(answers) if s == "oracle" else None,
                                             seg=u, drop=s.startswith("drop-"))
@@ -325,7 +334,7 @@ def write_summary(res, path):
                 L.append(f"| {label(c)} | " + " | ".join(f"{v[b]['exact_match']:.3f} | {v[b]['similarity']:.3f}" if b in v else "- | -" for b in ("4k", "8k")) + " |")
     if "speed" in res:
         sc = [c for c in res["speed"][0] if c != "prompt_len"]
-        L += ["", "## 首 token 延迟（毫秒，H100，eager，不含 CUDA graph）", "", "| 配置 | " + " | ".join(str(r["prompt_len"]) for r in res["speed"]) + " |",
+        L += ["", f"## 首 token 延迟（毫秒，{res['meta']['gpu'].replace('NVIDIA ', '')}，eager，不含 CUDA graph）", "", "| 配置 | " + " | ".join(str(r["prompt_len"]) for r in res["speed"]) + " |",
               "|---|" + "---|" * len(res["speed"])]
         for c in sc:
             L.append(f"| {label(c)} | " + " | ".join("显存不足" if r.get(c) is None else f"{r[c]*1e3:.1f}" + (f"（{r['big']/r[c]:.2f} 倍）" if r.get("big") else "")
@@ -352,6 +361,7 @@ def plot(res, out_dir):
             "spec": "SpecPrefill scores"}
     NAME.update({f"drop-{k}": f"{v}, rest DROPPED" for k, v in list(NAME.items())})
     NAME["specprefill"] = "SpecPrefill (x = % of whole prompt kept)"
+    NAME["rarecache"] = "RaReCache (x = % of whole prompt recomputed)"
     unit_en = lambda u: "" if u is None else ", sentences" if u == "sent" else f", look-ahead {u[3:]}" if str(u).startswith("lah") else f", blocks of {u}"
     cfgs = res["meta"]["configs"]
     series = []
@@ -453,6 +463,7 @@ def main():
     ap.add_argument("--n_sink", type=int, default=8)
     ap.add_argument("--n_tail", type=int, default=64)
     ap.add_argument("--out_dir", default=os.path.join(C.RESULTS_DIR, "recompute"))
+    ap.add_argument("--rarecache_fit", default="", help="fit.pt from scripts/fit_rarecache.py (rarecache:* configs)")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--plot_only", action="store_true")
     a = ap.parse_args()
@@ -465,7 +476,7 @@ def main():
         return
     dev = torch.device("cuda")
     tok, small, large = load_pair(dev)
-    E = Engine(tok, small, large, a.projector, dev, a.n_sink, a.n_tail)
+    E = Engine(tok, small, large, a.projector, dev, a.n_sink, a.n_tail, a.rarecache_fit or None)
     cfgs = [c for c in a.configs.split(",") if c]
     res["meta"] = {"gpu": torch.cuda.get_device_name(0), "configs": cfgs, "args": vars(a), "proj_step": E.proj_step,
                    "time": time.strftime("%F %T")}

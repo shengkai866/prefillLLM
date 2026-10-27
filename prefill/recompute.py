@@ -36,7 +36,7 @@ import math
 import torch
 import torch.nn.functional as F
 
-from .fast import FastHybrid, causal_mask_for, rms
+from .fast import FastHybrid, Graphed, causal_mask_for, rms
 from .kv import split_prompt
 
 SCORERS = ("random", "recent", "attn_small", "attn_big", "oracle", "spec")
@@ -76,20 +76,73 @@ def small_prefill_scored(S, ids, n_q, lo, hi):
     return torch.stack(hs, 0), score / len(S.layers)
 
 
+class LookaheadGraph:
+    """CUDA graph of one SpecPrefill look-ahead decode step of the small model for a fixed prompt length T (the eager
+    loop is launch-bound: ~20 ms per step for 0.6B on an L40S; vLLM, used by the official code, also replays graphs).
+    The token at absolute position p (a device tensor) writes its K/V into row p of the static buffer kb/vb
+    [L, Hkv, T + n_lah, D], attends to it under a mask over keys <= p (same math as the eager slice :p+1) and stores its
+    queries in qb [L, H, n_lah + 1, D] at slot p - T + 1. Row T + n_lah - 1 and slot n_lah are scratch for capture."""
+
+    def __init__(self, S, T, n_lah):
+        dev, dt = S.embed.device, S.embed.dtype
+        self.S, self.T, self.n_lah = S, T, n_lah
+        self.kb = torch.empty(S.n_layers, S.Hkv, T + n_lah, S.D, dtype=dt, device=dev)
+        self.vb = torch.empty_like(self.kb)
+        self.qb = torch.zeros(S.n_layers, S.H, n_lah + 1, S.D, dtype=dt, device=dev)
+        self.g = Graphed(self._step, torch.zeros(1, dtype=torch.long, device=dev),
+                         torch.tensor([T + n_lah - 1], dtype=torch.long, device=dev))
+
+    def _step(self, tok, p):
+        S = self.S
+        cos, sin = S.cos[p], S.sin[p]
+        mask = causal_mask_for(p, self.kb.shape[2], S.embed.dtype, p.device, S.rep)[None, None]
+        slot = p - self.T + 1
+        h = F.embedding(tok, S.embed)
+        for i, lw in enumerate(S.layers):
+            q, k, v = S._qkv(lw, rms(h, lw["ln1"], S.eps), cos, sin)
+            self.kb[i].index_copy_(1, p, k)
+            self.vb[i].index_copy_(1, p, v)
+            self.qb[i].index_copy_(1, slot, q)
+            o = F.scaled_dot_product_attention(q.reshape(S.Hkv, S.rep, S.D)[None], self.kb[i][None], self.vb[i][None],
+                                               attn_mask=mask, scale=S.scaling)[0]
+            h = S._mlp(lw, S._out(lw, h, o.reshape(S.H, 1, S.D)))
+        return F.linear(rms(h, S.norm, S.eps), S.lm_head)
+
+    def step(self, tok, p):
+        """tok [1] long on the device, p int -> logits [1, V] (graph-owned, overwritten by the next step)."""
+        return self.g(tok, torch.tensor([p], dtype=torch.long, device=tok.device))
+
+
 @torch.no_grad()
-def spec_importance(S, ids, n_lah=8, eos=(), kernel=13, collect=False):
+def spec_importance(S, ids, n_lah=8, eos=(), kernel=13, collect=False, graph=None):
     """SpecPrefill token importance, as in the official implementation: the small model prefills ids [T] and greedily
     decodes look-ahead tokens until it has n_lah queries (last prompt token + n_lah-1 look-ahead tokens; it stops early
     after producing EOS). In every layer and head each of these queries attends to the T prompt keys (softmax over the
     prompt only); scores are average-pooled along the prompt (kernel, stride 1), maxed over layers x heads and averaged
-    over the queries. Returns (hidden states [L+1, T, d] if collect else None, importance [T] fp32)."""
+    over the queries. Returns (hidden states [L+1, T, d] if collect else None, importance [T] fp32).
+    graph: a LookaheadGraph for (T, n_lah) to replay the look-ahead steps instead of running them eagerly."""
     T = ids.shape[0]
-    kb = torch.empty(S.n_layers, S.Hkv, T + n_lah, S.D, dtype=S.embed.dtype, device=ids.device)
-    vb = torch.empty_like(kb)
+    if graph is not None:
+        kb, vb = graph.kb, graph.vb
+    else:
+        kb = torch.empty(S.n_layers, S.Hkv, T + n_lah, S.D, dtype=S.embed.dtype, device=ids.device)
+        vb = torch.empty_like(kb)
     qs = []
     logits, hs = S.prefill(ids, kb, vb, collect=collect, last_q=qs)
-    qs = [[q] for q in qs]
-    for p in range(T, T + n_lah - 1):
+    if graph is not None:
+        for i, q in enumerate(qs):
+            graph.qb[i, :, :1] = q
+        n = 1
+        for p in range(T, T + n_lah - 1):
+            nxt = logits.argmax(-1)
+            if int(nxt) in eos:
+                break
+            logits = graph.step(nxt, p)
+            n += 1
+        qs = [[graph.qb[i, :, :n]] for i in range(S.n_layers)]
+    else:
+        qs = [[q] for q in qs]
+    for p in range(T, T + n_lah - 1) if graph is None else ():
         nxt = logits.argmax(-1)
         if int(nxt) in eos:
             break
@@ -205,6 +258,18 @@ class RecomputeHybrid(FastHybrid):
         self.eos, self.n_lah, self.spec_kernel, self.spec_chunk = set(eos), n_lah, spec_kernel, spec_chunk
         self.boundary, self.cap = boundary, cap  # boundary: bool [vocab], token contains . ! ? or a newline
         self.gen = torch.Generator(device="cpu").manual_seed(seed)
+        self.lah_graph, self._lah = False, None  # lah_graph=True: replay SpecPrefill look-ahead steps as a CUDA graph
+
+    def lah(self, T, n_lah):
+        """The LookaheadGraph for (T, n_lah) if graphs are on (one cached at a time), else None."""
+        if not self.lah_graph:
+            self._lah = None
+            return None
+        if self._lah is None or (self._lah.T, self._lah.n_lah) != (T, n_lah):
+            self._lah = None
+            torch.cuda.empty_cache()
+            self._lah = LookaheadGraph(self.S, T, n_lah)
+        return self._lah
 
     @torch.no_grad()
     def prefill_sel(self, ids, scorer="attn_big", frac=0.1, needles=None, seg=None, drop=False):
@@ -223,7 +288,8 @@ class RecomputeHybrid(FastHybrid):
             hs, score = small_prefill_scored(self.S, ids, t, s, s + m)
             hs = hs[:, s:s + m]
         elif scorer == "spec":
-            hs, score = spec_importance(self.S, ids, self.n_lah, self.eos, self.spec_kernel, collect=fill)
+            hs, score = spec_importance(self.S, ids, self.n_lah, self.eos, self.spec_kernel, collect=fill,
+                                        graph=self.lah(T, self.n_lah))
             hs, score = (hs[:, s:s + m] if fill else None), score[s:s + m]
         elif fill:
             hs = self.stage_small(ids[:s + m])[:, s:]
@@ -259,7 +325,8 @@ class RecomputeHybrid(FastHybrid):
         importance, keep ceil(frac x number of chunks) chunks of the WHOLE prompt; no sink / tail are forced, no
         projector). Returns (compact kbuf, vbuf, first-token logits, number of prompt tokens kept)."""
         T = ids.shape[0]
-        _, imp = spec_importance(self.S, ids, n_lah or self.n_lah, self.eos, self.spec_kernel)
+        n_lah = n_lah or self.n_lah
+        _, imp = spec_importance(self.S, ids, n_lah, self.eos, self.spec_kernel, graph=self.lah(T, n_lah))
         c = self.spec_chunk
         nc = (T + c - 1) // c
         unit = torch.arange(T, device=ids.device) // c

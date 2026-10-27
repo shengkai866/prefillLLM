@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=pf_cmp
 #SBATCH --account=drjieliu
-#SBATCH --partition=drjieliu-l40s,drjieliu-h100
+#SBATCH --partition=drjieliu-l40s
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
@@ -11,7 +11,7 @@
 #SBATCH --output=/nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM/logs/%x-%j.out
 #SBATCH --mail-user=shengkai@umich.edu
 #SBATCH --mail-type=END,FAIL
-# 0.6B vs 1.7B projector head-to-head on ONE GPU (L40S or H100, whichever is free; for REPORT_2026-10-23_06B_vs_17B.md).
+# 0.6B vs 1.7B projector head-to-head on ONE L40S GPU (for REPORT_2026-10-23_06B_vs_17B.md).
 # No training. Both models get the same evals in the same job, so every number is like for like:
 #   0.6B  r2_mix8k projector, 1.7B r5_s17_normB projector:
 #     TTFT, RULER / QA / NIAH with the round-5 recompute configs, GSM8K + code (plain and 10% sentences)

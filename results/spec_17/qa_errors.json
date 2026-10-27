@@ -1,0 +1,114 @@
+{
+ "big": {
+  "correct": 0.8033333333333333,
+  "elsewhere": 0.16333333333333333,
+  "not_in_doc": 0.03333333333333333,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "small": {
+  "correct": 0.6466666666666666,
+  "elsewhere": 0.27,
+  "not_in_doc": 0.056666666666666664,
+  "refusal": 0.02666666666666667,
+  "n": 300
+ },
+ "hyb": {
+  "correct": 0.76,
+  "elsewhere": 0.16333333333333333,
+  "not_in_doc": 0.07333333333333333,
+  "refusal": 0.0033333333333333335,
+  "n": 300
+ },
+ "attn_small:0.05:sent": {
+  "correct": 0.7766666666666666,
+  "elsewhere": 0.17666666666666667,
+  "not_in_doc": 0.04666666666666667,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_small:0.1:sent": {
+  "correct": 0.7666666666666667,
+  "elsewhere": 0.18666666666666668,
+  "not_in_doc": 0.04666666666666667,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_small:0.2:sent": {
+  "correct": 0.78,
+  "elsewhere": 0.17666666666666667,
+  "not_in_doc": 0.043333333333333335,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "drop-attn_small:0.05:sent": {
+  "correct": 0.5833333333333334,
+  "elsewhere": 0.21,
+  "not_in_doc": 0.19,
+  "refusal": 0.016666666666666666,
+  "n": 300
+ },
+ "drop-attn_small:0.1:sent": {
+  "correct": 0.6733333333333333,
+  "elsewhere": 0.19666666666666666,
+  "not_in_doc": 0.11,
+  "refusal": 0.02,
+  "n": 300
+ },
+ "drop-attn_small:0.2:sent": {
+  "correct": 0.7466666666666667,
+  "elsewhere": 0.18666666666666668,
+  "not_in_doc": 0.06,
+  "refusal": 0.006666666666666667,
+  "n": 300
+ },
+ "spec:0.1": {
+  "correct": 0.79,
+  "elsewhere": 0.17,
+  "not_in_doc": 0.04,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "spec:0.2": {
+  "correct": 0.7833333333333333,
+  "elsewhere": 0.17666666666666667,
+  "not_in_doc": 0.04,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "specprefill:0.1": {
+  "correct": 0.78,
+  "elsewhere": 0.17333333333333334,
+  "not_in_doc": 0.03666666666666667,
+  "refusal": 0.01,
+  "n": 300
+ },
+ "specprefill:0.2": {
+  "correct": 0.7966666666666666,
+  "elsewhere": 0.16333333333333333,
+  "not_in_doc": 0.03666666666666667,
+  "refusal": 0.0033333333333333335,
+  "n": 300
+ },
+ "specprefill:0.3": {
+  "correct": 0.8066666666666666,
+  "elsewhere": 0.15333333333333332,
+  "not_in_doc": 0.04,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "specprefill:0.5": {
+  "correct": 0.8166666666666667,
+  "elsewhere": 0.15,
+  "not_in_doc": 0.03333333333333333,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "specprefill:0.1:lah1": {
+  "correct": 0.7866666666666666,
+  "elsewhere": 0.16333333333333333,
+  "not_in_doc": 0.043333333333333335,
+  "refusal": 0.006666666666666667,
+  "n": 300
+ }
+}

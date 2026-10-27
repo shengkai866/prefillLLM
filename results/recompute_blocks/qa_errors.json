@@ -1,0 +1,114 @@
+{
+ "big": {
+  "correct": 0.8033333333333333,
+  "elsewhere": 0.16333333333333333,
+  "not_in_doc": 0.03333333333333333,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "hyb": {
+  "correct": 0.68,
+  "elsewhere": 0.23,
+  "not_in_doc": 0.09,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_big:0.05": {
+  "correct": 0.7466666666666667,
+  "elsewhere": 0.21666666666666667,
+  "not_in_doc": 0.03666666666666667,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_big:0.1": {
+  "correct": 0.7533333333333333,
+  "elsewhere": 0.20666666666666667,
+  "not_in_doc": 0.04,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_big:0.05:b8": {
+  "correct": 0.7566666666666667,
+  "elsewhere": 0.20666666666666667,
+  "not_in_doc": 0.03666666666666667,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_big:0.05:b16": {
+  "correct": 0.75,
+  "elsewhere": 0.20666666666666667,
+  "not_in_doc": 0.043333333333333335,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_big:0.05:b32": {
+  "correct": 0.7433333333333333,
+  "elsewhere": 0.21333333333333335,
+  "not_in_doc": 0.043333333333333335,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_big:0.05:b64": {
+  "correct": 0.7233333333333334,
+  "elsewhere": 0.22666666666666666,
+  "not_in_doc": 0.05,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_big:0.05:sent": {
+  "correct": 0.75,
+  "elsewhere": 0.21333333333333335,
+  "not_in_doc": 0.03666666666666667,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_big:0.1:b8": {
+  "correct": 0.7566666666666667,
+  "elsewhere": 0.19666666666666666,
+  "not_in_doc": 0.04666666666666667,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_big:0.1:b16": {
+  "correct": 0.7566666666666667,
+  "elsewhere": 0.19,
+  "not_in_doc": 0.05333333333333334,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_big:0.1:b32": {
+  "correct": 0.7533333333333333,
+  "elsewhere": 0.20666666666666667,
+  "not_in_doc": 0.04,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_big:0.1:b64": {
+  "correct": 0.76,
+  "elsewhere": 0.20333333333333334,
+  "not_in_doc": 0.03666666666666667,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_big:0.1:sent": {
+  "correct": 0.7566666666666667,
+  "elsewhere": 0.19,
+  "not_in_doc": 0.05333333333333334,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_small:0.05:sent": {
+  "correct": 0.7433333333333333,
+  "elsewhere": 0.21,
+  "not_in_doc": 0.043333333333333335,
+  "refusal": 0.0033333333333333335,
+  "n": 300
+ },
+ "attn_small:0.1:sent": {
+  "correct": 0.7633333333333333,
+  "elsewhere": 0.18333333333333332,
+  "not_in_doc": 0.05333333333333334,
+  "refusal": 0.0,
+  "n": 300
+ }
+}

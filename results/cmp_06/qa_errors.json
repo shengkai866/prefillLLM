@@ -1,0 +1,30 @@
+{
+ "hyb": {
+  "correct": 0.68,
+  "elsewhere": 0.23,
+  "not_in_doc": 0.09,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_small:0.05:sent": {
+  "correct": 0.7433333333333333,
+  "elsewhere": 0.21,
+  "not_in_doc": 0.043333333333333335,
+  "refusal": 0.0033333333333333335,
+  "n": 300
+ },
+ "attn_small:0.1:sent": {
+  "correct": 0.7633333333333333,
+  "elsewhere": 0.18333333333333332,
+  "not_in_doc": 0.05333333333333334,
+  "refusal": 0.0,
+  "n": 300
+ },
+ "attn_big:0.05": {
+  "correct": 0.7466666666666667,
+  "elsewhere": 0.21666666666666667,
+  "not_in_doc": 0.03666666666666667,
+  "refusal": 0.0,
+  "n": 300
+ }
+}

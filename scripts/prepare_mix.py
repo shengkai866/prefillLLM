@@ -65,11 +65,14 @@ def long_web(tok, n_per_source, n_test, min_tok=4224, max_tok=8448):
     save_store("web_long", "test", te)
 
 
-def load_sources(tok, B_tr: Builders, B_te: Builders, scale):
+def load_sources(tok, B_tr: Builders, B_te: Builders, scale, parts=("web", "qa", "code", "chat", "math")):
+    """B_tr may be None (test material only); parts selects which sources to load (same streams and seeds either way)."""
     T = Tok(tok)
     n = lambda x: max(20, int(x * scale))
     # web: token docs for raw prompts, decoded texts for haystacks, a word list for synthetic names
-    for B, split in ((B_tr, "train"), (B_te, "test")):
+    for B, split in ((B_tr, "train"), (B_te, "test")) if "web" in parts else ():
+        if B is None:
+            continue
         for name in ("fineweb_edu", "slimpajama", "web_long"):
             s = TokenStore(name, split)
             k = len(s) if split == "test" else min(len(s), n(12000))
@@ -83,7 +86,9 @@ def load_sources(tok, B_tr: Builders, B_te: Builders, scale):
         print(f"[src] web {split}: {len(B.web_docs)} docs, {len(B.web_texts)} haystack texts, {len(B.words)} words", flush=True)
 
     # SQuAD v2 (answerable only)
-    for B, split, k in ((B_tr, "train", n(30000)), (B_te, "validation", n(6000))):
+    for B, split, k in ((B_tr, "train", n(30000)), (B_te, "validation", n(6000))) if "qa" in parts else ():
+        if B is None:
+            continue
         rows = [ex for ex in stream("rajpurkar/squad_v2", None, split, k, seed=1)]
         ctx = {}
         for ex in rows:
@@ -94,7 +99,9 @@ def load_sources(tok, B_tr: Builders, B_te: Builders, scale):
         print(f"[src] squad {split}: {len(B.squad)} answerable, {len(B.squad_ctx)} contexts", flush=True)
 
     # HotpotQA distractor
-    for B, split, k in ((B_tr, "train", n(6000)), (B_te, "validation", n(2000))):
+    for B, split, k in ((B_tr, "train", n(6000)), (B_te, "validation", n(2000))) if "qa" in parts else ():
+        if B is None:
+            continue
         for ex in stream("hotpotqa/hotpot_qa", "distractor", split, k, seed=2):
             paras = [f"{t}: {''.join(s)}".strip() for t, s in zip(ex["context"]["title"], ex["context"]["sentences"])]
             B.hotpot.append({"paragraphs": paras, "question": ex["question"], "answer": ex["answer"]})
@@ -102,7 +109,9 @@ def load_sources(tok, B_tr: Builders, B_te: Builders, scale):
         print(f"[src] hotpot {split}: {len(B.hotpot)} questions, {len(B.hotpot_par)} distractor paragraphs", flush=True)
 
     # TriviaQA (reading comprehension, Wikipedia evidence)
-    for B, split, k in ((B_tr, "train", n(3000)), (B_te, "validation", n(1200))):
+    for B, split, k in ((B_tr, "train", n(3000)), (B_te, "validation", n(1200))) if "qa" in parts else ():
+        if B is None:
+            continue
         for ex in stream("mandarjoshi/trivia_qa", "rc.wikipedia", split, k, seed=3, buffer=500):
             ctx = "\n\n".join(ex["entity_pages"]["wiki_context"])
             if not ctx:
@@ -114,6 +123,8 @@ def load_sources(tok, B_tr: Builders, B_te: Builders, scale):
                 B.trivia_ctx.append((ch, T.n(ch)))
         print(f"[src] trivia {split}: {len(B.trivia)} questions, {len(B.trivia_ctx)} distractor chunks", flush=True)
 
+    if not {"code", "chat", "math"} & set(parts):
+        return
     # code: held-out repositories by hash
     tr_files, te_files = [], []
     for ex in stream("codeparrot/codeparrot-clean", None, "train", n(120000), seed=4, buffer=20000):
