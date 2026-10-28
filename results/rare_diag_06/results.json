@@ -1,0 +1,646 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "hyb",
+   "attn_small:0.1:sent",
+   "rarecache:0",
+   "rarecache-s:0",
+   "rarecache-f:0",
+   "rarecache-sf:0",
+   "rarecache:0.1",
+   "rarecache-s:0.1",
+   "rarecache-sf:0.1"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r2_mix8k/projector.pt",
+   "configs": "hyb,attn_small:0.1:sent,rarecache:0,rarecache-s:0,rarecache-f:0,rarecache-sf:0,rarecache:0.1,rarecache-s:0.1,rarecache-sf:0.1",
+   "speed_configs": "big,hyb,attn_big:0.05,attn_big:0.1,attn_big:0.2,attn_small:0.05,attn_small:0.1,attn_small:0.2,random:0.1",
+   "tasks": "qa,gsm8k",
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_qa": 30,
+   "n_gsm8k": 60,
+   "n_code": 100,
+   "speed_lengths": "4096,8192,16384,32768",
+   "speed_reps": 5,
+   "speed_graph": false,
+   "n_qa_long": 40,
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/rare_diag_06",
+   "rarecache_fit": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/rarecache_0.6B/fit.pt",
+   "force": false,
+   "plot_only": false
+  },
+  "proj_step": 12000,
+  "time": "2026-10-28 15:35:58"
+ },
+ "qa": [
+  {
+   "config": "hyb",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.0,
+   "f1": 0.5935714285714285,
+   "em": 0.4666666666666667,
+   "contains": 0.4666666666666667
+  },
+  {
+   "config": "hyb",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.0,
+   "f1": 0.37476190476190474,
+   "em": 0.2,
+   "contains": 0.3
+  },
+  {
+   "config": "hyb",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.0,
+   "f1": 0.7092394152688271,
+   "em": 0.5333333333333333,
+   "contains": 0.7333333333333333
+  },
+  {
+   "config": "hyb",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.0,
+   "f1": 0.6720240705240775,
+   "em": 0.4666666666666667,
+   "contains": 0.7333333333333333
+  },
+  {
+   "config": "hyb",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.0,
+   "f1": 0.7055555555555556,
+   "em": 0.6666666666666666,
+   "contains": 0.7
+  },
+  {
+   "config": "hyb",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.0,
+   "f1": 0.7119929453262787,
+   "em": 0.6666666666666666,
+   "contains": 0.7666666666666667
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.1055325398827882,
+   "f1": 0.6574344609638727,
+   "em": 0.5,
+   "contains": 0.5333333333333333
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.10220684871032207,
+   "f1": 0.4596825396825397,
+   "em": 0.3,
+   "contains": 0.3333333333333333
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.10503395120255778,
+   "f1": 0.8514796777296777,
+   "em": 0.6333333333333333,
+   "contains": 0.9
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.10273251591331124,
+   "f1": 0.8016227693172665,
+   "em": 0.6333333333333333,
+   "contains": 0.8666666666666667
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.10488711080666019,
+   "f1": 0.7388888888888889,
+   "em": 0.7,
+   "contains": 0.7333333333333333
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.10256531855583224,
+   "f1": 0.6761904761904762,
+   "em": 0.6333333333333333,
+   "contains": 0.7
+  },
+  {
+   "config": "rarecache:0",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.00028529543546982575,
+   "f1": 0.19421713227586607,
+   "em": 0.13333333333333333,
+   "contains": 0.23333333333333334
+  },
+  {
+   "config": "rarecache:0",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.0001321263233259634,
+   "f1": 0.09191774891774891,
+   "em": 0.03333333333333333,
+   "contains": 0.06666666666666667
+  },
+  {
+   "config": "rarecache:0",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.00028485707507623723,
+   "f1": 0.11996272055319371,
+   "em": 0.0,
+   "contains": 0.26666666666666666
+  },
+  {
+   "config": "rarecache:0",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.0001318944543167692,
+   "f1": 0.11843641127109686,
+   "em": 0.0,
+   "contains": 0.16666666666666666
+  },
+  {
+   "config": "rarecache:0",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.0002854488545786741,
+   "f1": 0.18747775031985559,
+   "em": 0.0,
+   "contains": 0.5666666666666667
+  },
+  {
+   "config": "rarecache:0",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.00013167076741159533,
+   "f1": 0.18262233571158057,
+   "em": 0.0,
+   "contains": 0.4
+  },
+  {
+   "config": "rarecache-s:0",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.020541271353827453,
+   "f1": 0.23139406889406888,
+   "em": 0.2,
+   "contains": 0.23333333333333334
+  },
+  {
+   "config": "rarecache-s:0",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.009513095279469364,
+   "f1": 0.13323232323232323,
+   "em": 0.06666666666666667,
+   "contains": 0.06666666666666667
+  },
+  {
+   "config": "rarecache-s:0",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.02050970940548908,
+   "f1": 0.1297883597883598,
+   "em": 0.06666666666666667,
+   "contains": 0.2
+  },
+  {
+   "config": "rarecache-s:0",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.009496400710807384,
+   "f1": 0.13493118303986246,
+   "em": 0.03333333333333333,
+   "contains": 0.2
+  },
+  {
+   "config": "rarecache-s:0",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.020552317529664535,
+   "f1": 0.2803314929836669,
+   "em": 0.16666666666666666,
+   "contains": 0.4
+  },
+  {
+   "config": "rarecache-s:0",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.009480295253634863,
+   "f1": 0.4472730972730973,
+   "em": 0.36666666666666664,
+   "contains": 0.5666666666666667
+  },
+  {
+   "config": "rarecache-f:0",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.00028529543546982575,
+   "f1": 0.19202248044353307,
+   "em": 0.13333333333333333,
+   "contains": 0.23333333333333334
+  },
+  {
+   "config": "rarecache-f:0",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.0001321263233259634,
+   "f1": 0.10346153846153847,
+   "em": 0.03333333333333333,
+   "contains": 0.06666666666666667
+  },
+  {
+   "config": "rarecache-f:0",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.00028485707507623723,
+   "f1": 0.13556304305767441,
+   "em": 0.0,
+   "contains": 0.3333333333333333
+  },
+  {
+   "config": "rarecache-f:0",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.0001318944543167692,
+   "f1": 0.1332230511081086,
+   "em": 0.0,
+   "contains": 0.23333333333333334
+  },
+  {
+   "config": "rarecache-f:0",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.0002854488545786741,
+   "f1": 0.1952200177142969,
+   "em": 0.0,
+   "contains": 0.5666666666666667
+  },
+  {
+   "config": "rarecache-f:0",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.00013167076741159533,
+   "f1": 0.206935989721829,
+   "em": 0.03333333333333333,
+   "contains": 0.4
+  },
+  {
+   "config": "rarecache-sf:0",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.020541271353827453,
+   "f1": 0.23256073556073556,
+   "em": 0.2,
+   "contains": 0.26666666666666666
+  },
+  {
+   "config": "rarecache-sf:0",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.009513095279469364,
+   "f1": 0.13145454545454546,
+   "em": 0.06666666666666667,
+   "contains": 0.06666666666666667
+  },
+  {
+   "config": "rarecache-sf:0",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.02050970940548908,
+   "f1": 0.15115588115588116,
+   "em": 0.06666666666666667,
+   "contains": 0.23333333333333334
+  },
+  {
+   "config": "rarecache-sf:0",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.009496400710807384,
+   "f1": 0.13351613347962232,
+   "em": 0.03333333333333333,
+   "contains": 0.2
+  },
+  {
+   "config": "rarecache-sf:0",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.020552317529664535,
+   "f1": 0.3053314929836669,
+   "em": 0.2,
+   "contains": 0.43333333333333335
+  },
+  {
+   "config": "rarecache-sf:0",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.009480295253634863,
+   "f1": 0.4472730972730973,
+   "em": 0.36666666666666664,
+   "contains": 0.5666666666666667
+  },
+  {
+   "config": "rarecache:0.1",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.10041369533420513,
+   "f1": 0.24724819624819624,
+   "em": 0.1,
+   "contains": 0.2
+  },
+  {
+   "config": "rarecache:0.1",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.10019553523341672,
+   "f1": 0.1314636561695385,
+   "em": 0.03333333333333333,
+   "contains": 0.13333333333333333
+  },
+  {
+   "config": "rarecache:0.1",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.10042064328411814,
+   "f1": 0.1662466440515221,
+   "em": 0.03333333333333333,
+   "contains": 0.2
+  },
+  {
+   "config": "rarecache:0.1",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.10019124176488844,
+   "f1": 0.15563353366009913,
+   "em": 0.03333333333333333,
+   "contains": 0.3
+  },
+  {
+   "config": "rarecache:0.1",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.10041387171525175,
+   "f1": 0.31661797461797464,
+   "em": 0.16666666666666666,
+   "contains": 0.5666666666666667
+  },
+  {
+   "config": "rarecache:0.1",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.10018609219507622,
+   "f1": 0.25725348725348723,
+   "em": 0.06666666666666667,
+   "contains": 0.43333333333333335
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.11790279307253819,
+   "f1": 0.37653679653679656,
+   "em": 0.3,
+   "contains": 0.3
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.10850636310593452,
+   "f1": 0.2192250233426704,
+   "em": 0.1,
+   "contains": 0.16666666666666666
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.11727413282456434,
+   "f1": 0.2947258384758385,
+   "em": 0.2,
+   "contains": 0.23333333333333334
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.10787182650583184,
+   "f1": 0.21558129281914448,
+   "em": 0.13333333333333333,
+   "contains": 0.23333333333333334
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.11715040379429187,
+   "f1": 0.6465186021707761,
+   "em": 0.5666666666666667,
+   "contains": 0.7666666666666667
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.1077435813641289,
+   "f1": 0.5452380952380952,
+   "em": 0.5,
+   "contains": 0.6
+  },
+  {
+   "config": "rarecache-sf:0.1",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.11789325563810804,
+   "f1": 0.36987012987012985,
+   "em": 0.26666666666666666,
+   "contains": 0.26666666666666666
+  },
+  {
+   "config": "rarecache-sf:0.1",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.10850195451800523,
+   "f1": 0.23412698412698413,
+   "em": 0.1,
+   "contains": 0.13333333333333333
+  },
+  {
+   "config": "rarecache-sf:0.1",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.11728356467030773,
+   "f1": 0.2947258384758385,
+   "em": 0.2,
+   "contains": 0.23333333333333334
+  },
+  {
+   "config": "rarecache-sf:0.1",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.10786302155710527,
+   "f1": 0.21558129281914448,
+   "em": 0.13333333333333333,
+   "contains": 0.23333333333333334
+  },
+  {
+   "config": "rarecache-sf:0.1",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 30,
+   "frac": 0.11715029507149445,
+   "f1": 0.6465186021707761,
+   "em": 0.5666666666666667,
+   "contains": 0.7666666666666667
+  },
+  {
+   "config": "rarecache-sf:0.1",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 30,
+   "frac": 0.10772605008977874,
+   "f1": 0.5674603174603174,
+   "em": 0.5,
+   "contains": 0.6333333333333333
+  }
+ ],
+ "gsm8k": [
+  {
+   "config": "hyb",
+   "n": 60,
+   "accuracy": 0.8833333333333333,
+   "format_follow": 0.5333333333333333,
+   "prompt_tokens": 2035.0666666666666
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "n": 60,
+   "accuracy": 0.9,
+   "format_follow": 0.6333333333333333,
+   "prompt_tokens": 2035.0666666666666
+  },
+  {
+   "config": "rarecache:0",
+   "n": 60,
+   "accuracy": 0.4166666666666667,
+   "format_follow": 0.0,
+   "prompt_tokens": 2035.0666666666666
+  },
+  {
+   "config": "rarecache-s:0",
+   "n": 60,
+   "accuracy": 0.8833333333333333,
+   "format_follow": 0.03333333333333333,
+   "prompt_tokens": 2035.0666666666666
+  },
+  {
+   "config": "rarecache-f:0",
+   "n": 60,
+   "accuracy": 0.45,
+   "format_follow": 0.0,
+   "prompt_tokens": 2035.0666666666666
+  },
+  {
+   "config": "rarecache-sf:0",
+   "n": 60,
+   "accuracy": 0.85,
+   "format_follow": 0.03333333333333333,
+   "prompt_tokens": 2035.0666666666666
+  },
+  {
+   "config": "rarecache:0.1",
+   "n": 60,
+   "accuracy": 0.4666666666666667,
+   "format_follow": 0.016666666666666666,
+   "prompt_tokens": 2035.0666666666666
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "n": 60,
+   "accuracy": 0.8833333333333333,
+   "format_follow": 0.05,
+   "prompt_tokens": 2035.0666666666666
+  },
+  {
+   "config": "rarecache-sf:0.1",
+   "n": 60,
+   "accuracy": 0.9,
+   "format_follow": 0.03333333333333333,
+   "prompt_tokens": 2035.0666666666666
+  }
+ ]
+}

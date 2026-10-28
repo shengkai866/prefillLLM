@@ -86,8 +86,8 @@ class LookaheadGraph:
     def __init__(self, S, T, n_lah):
         dev, dt = S.embed.device, S.embed.dtype
         self.S, self.T, self.n_lah = S, T, n_lah
-        self.kb = torch.empty(S.n_layers, S.Hkv, T + n_lah, S.D, dtype=dt, device=dev)
-        self.vb = torch.empty_like(self.kb)
+        self.kb = torch.zeros(S.n_layers, S.Hkv, T + n_lah, S.D, dtype=dt, device=dev)  # rows > p are masked, but
+        self.vb = torch.zeros_like(self.kb)                                               # must not hold NaN patterns
         self.qb = torch.zeros(S.n_layers, S.H, n_lah + 1, S.D, dtype=dt, device=dev)
         self.g = Graphed(self._step, torch.zeros(1, dtype=torch.long, device=dev),
                          torch.tensor([T + n_lah - 1], dtype=torch.long, device=dev))
@@ -155,9 +155,14 @@ def spec_importance(S, ids, n_lah=8, eos=(), kernel=13, collect=False, graph=Non
                                                vb[i, :, :p + 1][None], scale=S.scaling)[0]
             h = S._mlp(lw, S._out(lw, h, o.reshape(S.H, 1, S.D)))
         logits = F.linear(rms(h, S.norm, S.eps), S.lm_head)
+    return hs, spec_scores(S, [torch.cat(ql, 1) for ql in qs], kb, T, kernel)
+
+
+def spec_scores(S, qs, kb, T, kernel=13):
+    """SpecPrefill importance [T] fp32 from the per-layer look-ahead queries qs [L] x [H, n, D] against the prompt keys
+    kb[:, :, :T] (see spec_importance)."""
     imp = None
-    for i, ql in enumerate(qs):
-        q = torch.cat(ql, 1)  # [H, n, D]
+    for i, q in enumerate(qs):
         n = q.shape[1]
         a = torch.matmul(q.reshape(S.Hkv, S.rep * n, S.D).float(), kb[i, :, :T].float().transpose(1, 2)) * S.scaling
         a = a.softmax(-1).reshape(S.H, n, T)
@@ -165,38 +170,54 @@ def spec_importance(S, ids, n_lah=8, eos=(), kernel=13, collect=False, graph=Non
             a = F.avg_pool1d(a, kernel, 1, kernel // 2)
         a = a.amax(0)  # [n, T], max over heads; max over layers below
         imp = a if imp is None else torch.maximum(imp, a)
-    return hs, imp.mean(0)
+    return imp.mean(0)
 
 
-def prefill_kept(L, ids, pos):
+def prefill_kept(L, ids, pos, extra=0):
     """Large-model prefill of only the tokens at sorted absolute positions pos [K] (the others are dropped).
-    Returns compact (kbuf, vbuf [L, Hkv, K, D], last-token logits [1, V])."""
+    Returns compact (kbuf, vbuf [L, Hkv, K + extra, D], last-token logits [1, V]); the `extra` trailing rows are
+    left free for tokens appended later (extend_at with rows=)."""
     K = pos.shape[0]
-    kbuf = torch.empty(L.n_layers, L.Hkv, K, L.D, dtype=L.embed.dtype, device=ids.device)
-    vbuf = torch.empty_like(kbuf)
+    kbuf = torch.zeros(L.n_layers, L.Hkv, K + extra, L.D, dtype=L.embed.dtype, device=ids.device)  # free rows are
+    vbuf = torch.zeros_like(kbuf)                                                                  # masked, not NaN
     logits, _ = L.prefill(ids[pos], kbuf, vbuf, pos=pos)
     return kbuf, vbuf, logits
 
 
+def spec_select(imp, frac, chunk=32, T=None):
+    """SpecPrefill chunk selection: positions (sorted) of the ceil(frac x number of chunks) `chunk`-token chunks of
+    imp[:T] with the highest mean importance."""
+    T = imp.shape[0] if T is None else T
+    nc = (T + chunk - 1) // chunk
+    unit = torch.arange(T, device=imp.device) // chunk
+    cs = torch.zeros(nc, device=imp.device).scatter_reduce(0, unit, imp[:T], "mean", include_self=False)
+    keep = torch.zeros(nc, dtype=torch.bool, device=imp.device)
+    keep[torch.topk(cs, math.ceil(nc * frac)).indices] = True
+    return torch.nonzero(keep[unit]).flatten()
+
+
 @torch.no_grad()
-def extend_at(L, ids, pos, kbuf, vbuf, n_q=0, lo=0, hi=0):
-    """Run tokens ids [Q] at sorted absolute positions pos [Q] through the large model against the KV buffer
-    kbuf/vbuf [L, Hkv, T, D]; in every layer their K/V are written to rows `pos` before attention.
-    Returns (last-token logits [1, V], attention mass of the last n_q queries on keys [lo, hi) or None)."""
+def extend_at(L, ids, pos, kbuf, vbuf, n_q=0, lo=0, hi=0, rows=None):
+    """Run tokens ids [Q] at sorted absolute positions pos [Q] through the model L against the KV buffer
+    kbuf/vbuf [L, Hkv, T, D]; in every layer their K/V are written to buffer rows `rows` (default: pos) before
+    attention, and a query at row r sees buffer rows <= r. rows differs from pos for compact caches (dropped tokens),
+    whose rows 0..K-1 hold earlier positions.
+    Returns (last-token logits [1, V], attention mass of the last n_q queries on buffer rows [lo, hi) or None)."""
     Q = ids.shape[0]
     T = kbuf.shape[2]
+    rows = pos if rows is None else rows
     cos, sin = L.cos[pos], L.sin[pos]
-    mask = causal_mask_for(pos, T, L.embed.dtype, ids.device, L.rep)[None, None]
+    mask = causal_mask_for(rows, T, L.embed.dtype, ids.device, L.rep)[None, None]
     h = F.embedding(ids, L.embed)
     score = torch.zeros(hi - lo, dtype=torch.float32, device=ids.device) if n_q else None
     for i, lw in enumerate(L.layers):
         q, k, v = L._qkv(lw, rms(h, lw["ln1"], L.eps), cos, sin)
-        kbuf[i].index_copy_(1, pos, k)
-        vbuf[i].index_copy_(1, pos, v)
+        kbuf[i].index_copy_(1, rows, k)
+        vbuf[i].index_copy_(1, rows, v)
         qg = q.reshape(L.Hkv, L.rep * Q, L.D)
         o = F.scaled_dot_product_attention(qg[None], kbuf[i][None], vbuf[i][None], attn_mask=mask, scale=L.scaling)[0]
         if n_q:
-            score += attn_mass(q[:, Q - n_q:], kbuf[i], pos[Q - n_q:], lo, hi, L.scaling)
+            score += attn_mass(q[:, Q - n_q:], kbuf[i], rows[Q - n_q:], lo, hi, L.scaling)
         h = L._mlp(lw, L._out(lw, h, o.reshape(L.H, Q, L.D)))
     logits = F.linear(rms(h[-1:], L.norm, L.eps), L.lm_head)
     return logits, (score / len(L.layers) if n_q else None)
@@ -327,11 +348,5 @@ class RecomputeHybrid(FastHybrid):
         T = ids.shape[0]
         n_lah = n_lah or self.n_lah
         _, imp = spec_importance(self.S, ids, n_lah, self.eos, self.spec_kernel, graph=self.lah(T, n_lah))
-        c = self.spec_chunk
-        nc = (T + c - 1) // c
-        unit = torch.arange(T, device=ids.device) // c
-        cs = torch.zeros(nc, device=ids.device).scatter_reduce(0, unit, imp, "mean", include_self=False)
-        keep = torch.zeros(nc, dtype=torch.bool, device=ids.device)
-        keep[torch.topk(cs, math.ceil(nc * frac)).indices] = True
-        pos = torch.nonzero(keep[unit]).flatten()
+        pos = spec_select(imp, frac, self.spec_chunk)
         return (*prefill_kept(self.L, ids, pos), int(pos.numel()))

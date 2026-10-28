@@ -1,0 +1,141 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "big",
+   "hyb",
+   "attn_big:0.02",
+   "attn_big:0.05",
+   "attn_big:0.1",
+   "attn_big:0.2",
+   "attn_small:0.02",
+   "attn_small:0.05",
+   "attn_small:0.1",
+   "attn_small:0.2",
+   "random:0.1",
+   "random:0.2",
+   "recent:0.1",
+   "recent:0.2",
+   "oracle"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r2_mix8k/projector.pt",
+   "configs": "big,hyb,attn_big:0.02,attn_big:0.05,attn_big:0.1,attn_big:0.2,attn_small:0.02,attn_small:0.05,attn_small:0.1,attn_small:0.2,random:0.1,random:0.2,recent:0.1,recent:0.2,oracle",
+   "speed_configs": "big,small,hyb,attn_small:0.1:sent,attn_small:0.2:sent,drop-attn_small:0.2:sent,specprefill:0.1,specprefill:0.2,specprefill:0.3,specprefill:0.1:lah1",
+   "tasks": "speed,breakdown",
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_qa": 50,
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "speed_lengths": "4096,8192,16384,32768",
+   "speed_reps": 5,
+   "speed_graph": true,
+   "n_qa_long": 40,
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/speed_graph_06",
+   "rarecache_fit": "",
+   "force": false,
+   "plot_only": false
+  },
+  "proj_step": 12000,
+  "time": "2026-10-27 19:48:16"
+ },
+ "speed": [
+  {
+   "prompt_len": 4096,
+   "big": 0.3756897719576955,
+   "small": 0.047932570800185204,
+   "hyb": 0.14164346549659967,
+   "attn_small:0.1:sent": 0.1700277952477336,
+   "attn_small:0.2:sent": 0.21326244063675404,
+   "drop-attn_small:0.2:sent": 0.13391629233956337,
+   "specprefill:0.1": 0.15654944069683552,
+   "specprefill:0.2": 0.1891629584133625,
+   "specprefill:0.3": 0.22083966806530952,
+   "specprefill:0.1:lah1": 0.09737104270607233
+  },
+  {
+   "prompt_len": 8192,
+   "big": 0.8931595841422677,
+   "small": 0.12935681268572807,
+   "hyb": 0.2906153127551079,
+   "attn_small:0.1:sent": 0.3940669000148773,
+   "attn_small:0.2:sent": 0.49731875490397215,
+   "drop-attn_small:0.2:sent": 0.2899597194045782,
+   "specprefill:0.1": 0.3051735917106271,
+   "specprefill:0.2": 0.3714935565367341,
+   "specprefill:0.3": 0.44526651594787836,
+   "specprefill:0.1:lah1": 0.21354030538350344
+  },
+  {
+   "prompt_len": 16384,
+   "big": 2.0062512969598174,
+   "small": 0.39128824044018984,
+   "hyb": 0.6884021097794175,
+   "attn_small:0.1:sent": 0.9943665079772472,
+   "attn_small:0.2:sent": 1.3007087325677276,
+   "drop-attn_small:0.2:sent": 0.7320935428142548,
+   "specprefill:0.1": 0.7086317371577024,
+   "specprefill:0.2": 0.8608849700540304,
+   "specprefill:0.3": 1.0632313517853618,
+   "specprefill:0.1:lah1": 0.5519864363595843
+  },
+  {
+   "prompt_len": 32768,
+   "big": 5.038919219747186,
+   "small": 1.1545123429968953,
+   "hyb": 1.7256206665188074,
+   "attn_small:0.1:sent": 2.721138105727732,
+   "attn_small:0.2:sent": 3.778522682376206,
+   "drop-attn_small:0.2:sent": 1.9303454803302884,
+   "specprefill:0.1": 1.7683975640684366,
+   "specprefill:0.2": 2.173442034982145,
+   "specprefill:0.3": 2.599783029407263,
+   "specprefill:0.1:lah1": 1.4875725507736206
+  }
+ ],
+ "breakdown": [
+  {
+   "prompt_len": 4096,
+   "n_recomputed": 408,
+   "small": 0.050002592615783215,
+   "small_scored": 0.05406512692570686,
+   "fold": 0.05966817960143089,
+   "tail": 0.037558356299996376,
+   "recompute": 0.06391831114888191,
+   "big": 0.4055568492040038
+  },
+  {
+   "prompt_len": 8192,
+   "n_recomputed": 841,
+   "small": 0.133356474339962,
+   "small_scored": 0.1424983823671937,
+   "fold": 0.1206476567313075,
+   "tail": 0.043337276205420494,
+   "recompute": 0.14165592845529318,
+   "big": 0.9194843294098973
+  },
+  {
+   "prompt_len": 16384,
+   "n_recomputed": 1644,
+   "small": 0.3982129292562604,
+   "small_scored": 0.4191915849223733,
+   "fold": 0.24216642044484615,
+   "tail": 0.055358899757266045,
+   "recompute": 0.34508881252259016,
+   "big": 2.0958619862794876
+  },
+  {
+   "prompt_len": 32768,
+   "n_recomputed": 3290,
+   "small": 1.1608153628185391,
+   "small_scored": 1.2158854054287076,
+   "fold": 0.48420156445354223,
+   "tail": 0.07906119525432587,
+   "recompute": 1.0105539113283157,
+   "big": 5.038620056584477
+  }
+ ]
+}

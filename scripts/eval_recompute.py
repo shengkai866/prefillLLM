@@ -15,13 +15,21 @@ Tasks (stored in results.json as each finishes; finished tasks are skipped on re
   ruler    RULER 4096 / 8192, 13 tasks, same examples as round 2 (same seeds)
   qa       SQuAD v2 / HotpotQA / TriviaQA at ~3.5k / ~7.5k tokens (first n of the round-2 pool)
   niah     round-1 passcode needle at 2048 / 3584 / 7680
-  speed    TTFT (eager fast path) vs prompt length for big, hyb and the recompute configs
+  speed    TTFT (eager fast path) vs prompt length for big, hyb and the recompute configs; --speed_graph replays
+           SpecPrefill's look-ahead decode steps as a CUDA graph (prefill/recompute.LookaheadGraph) like the official
+           vLLM implementation does, instead of the launch-bound eager loop
+  speed_allgraph  TTFT with every method (big, small, hyb, attn_small:*:sent, drop-attn_small:*:sent, specprefill:*)
+           captured as piecewise CUDA graphs (prefill/graphs.py), so no method pays kernel-launch overhead
+  breakdown  stage timings of the hybrid pipeline vs prompt length: small prefill (plain / with tail scoring),
+           projector fold, large sink+tail call, large recompute call (10 % sentences), large model alone
   gsm8k    GSM8K 8-shot as chat turns (same prompts as scripts/evaluate_v2.py), any config incl. recompute
   code     next-line completion on held-out repositories (same pool as scripts/evaluate_v2.py)
+  qa_long / niah_long   the qa / niah tasks on the 16k / 32k pools of scripts/prepare_long_eval.py
 Every generation is written to generations.jsonl for error analysis.
 """
 import argparse
 import collections
+import gc
 import json
 import os
 import random
@@ -35,12 +43,13 @@ import torch  # noqa: E402
 from evaluate_v2 import mean, qa_scores, task_code, task_gsm8k  # noqa: E402
 from prefill import config as C  # noqa: E402
 from prefill.fast import FastBig, FastQwen3, FoldedProjectorKV, kv_to_dynamic_cache, time_call  # noqa: E402
+from prefill.graphs import build as build_graphs  # noqa: E402
 from prefill.kv import greedy_decode, split_prompt, true_prefill  # noqa: E402
 from prefill.mixdata import PromptPool, Tok  # noqa: E402
 from prefill.models import eos_ids, load_pair  # noqa: E402
 from prefill.projector import Projector  # noqa: E402
 from prefill.rarecache import RaReCache  # noqa: E402
-from prefill.recompute import RecomputeHybrid  # noqa: E402
+from prefill.recompute import RecomputeHybrid, choose_units, extend_at, segment_ids, small_prefill_scored  # noqa: E402
 
 FRACS = (0.02, 0.05, 0.1, 0.2)
 DEFAULT_CFGS = ["big", "hyb"] + [f"{s}:{f}" for s in ("attn_big", "attn_small") for f in FRACS] + \
@@ -59,6 +68,11 @@ def parse(cfg):
     return s, float(f), (None if u is None else u if u == "sent" or u.startswith("lah") else int(u[1:]))
 
 
+def rarecache_opts(s):
+    """'rarecache' -> '', 'rarecache-sf' -> 'sf' (s: force sink/tail recompute, f: apply the ridge map in fp32)."""
+    return s[len("rarecache-"):] if s.startswith("rarecache-") else ""
+
+
 def unit_zh(u):
     return "逐 token" if u is None else "按句子" if u == "sent" else f"look-ahead {u[3:]}" if str(u).startswith("lah") else f"{u} token 一块"
 
@@ -75,8 +89,9 @@ def label(cfg):
         return SCORER_ZH["oracle"]
     if s == "specprefill":
         return f"SpecPrefill 保留整段 {f:.0%}" + (f"，{unit_zh(u)}" if u is not None else "")
-    if s == "rarecache":
-        return f"RaReCache 重算整段 {f:.0%}"
+    if s.startswith("rarecache"):
+        o = rarecache_opts(s)
+        return f"RaReCache 重算整段 {f:.0%}" + ("，强制开头/尾部" if "s" in o else "") + ("，fp32 映射" if "f" in o else "")
     if s.startswith("drop-"):
         return f"丢弃其余（不投影）：{SCORER_ZH[s[5:]]} {f:.0%}" + (f"，{unit_zh(u)}" if u is not None else "")
     return f"{SCORER_ZH[s]} {f:.0%}" + (f"，{unit_zh(u)}" if u is not None else "")
@@ -120,8 +135,10 @@ class Engine:
         if s == "specprefill":
             kb, vb, lg, n = self.rh.prefill_specprefill(ids, f, n_lah=int(u[3:]) if u else None)
             return kb, vb, lg, n / ids.shape[0]
-        if s == "rarecache":
-            kb, vb, lg, n = self.rc.prefill(ids, f)
+        if s.startswith("rarecache"):
+            o = rarecache_opts(s)
+            self.rc.fp32 = "f" in o
+            kb, vb, lg, n = self.rc.prefill(ids, f, n_sink=self.rh.n_sink if "s" in o else 0, n_tail=self.rh.n_tail if "s" in o else 0)
             return kb, vb, lg, n / ids.shape[0]
         kb, vb, lg, n = self.rh.prefill_sel(ids, s.removeprefix("drop-"), f, needles=self.needles(answers) if s == "oracle" else None,
                                             seg=u, drop=s.startswith("drop-"))
@@ -201,8 +218,8 @@ def task_ruler(E, cfgs, n_per_task, lengths, log):
     return rows
 
 
-def task_qa(E, cfgs, n, log):
-    pool = PromptPool("qa_eval")
+def task_qa(E, cfgs, n, log, pool="qa_eval", name="qa"):
+    pool = PromptPool(pool)
     cells = collections.defaultdict(list)
     for i, m in enumerate(pool.meta):
         cells[(m["source"], m["bucket"])].append(i)
@@ -216,7 +233,7 @@ def task_qa(E, cfgs, n, log):
                 r = qa_scores(out, ans)
                 sc.append(r)
                 fr.append(frac)
-                log(task="qa", config=c, source=src, bucket=b, idx=i, question=pool.meta[i]["question"], answers=ans, output=out, frac=frac, **r)
+                log(task=name, config=c, source=src, bucket=b, idx=i, question=pool.meta[i]["question"], answers=ans, output=out, frac=frac, **r)
             row = {"config": c, "source": src, "bucket": b, "n": len(sc), "frac": mean(fr),
                    **{k: mean([s[k] for s in sc]) for k in ("f1", "em", "contains")}}
             rows.append(row)
@@ -224,8 +241,8 @@ def task_qa(E, cfgs, n, log):
     return rows
 
 
-def task_niah(E, cfgs, log):
-    pool = PromptPool("niah_eval")
+def task_niah(E, cfgs, log, pool="niah_eval", name="niah"):
+    pool = PromptPool(pool)
     rows = []
     for c in cfgs:
         per, fr = collections.defaultdict(list), collections.defaultdict(list)
@@ -234,7 +251,7 @@ def task_niah(E, cfgs, log):
             ok = float(m["answers"][0] in out)
             per[m["bucket"]].append(ok)
             fr[m["bucket"]].append(frac)
-            log(task="niah", config=c, length=int(m["bucket"]), idx=i, answers=m["answers"], output=out, score=ok, frac=frac)
+            log(task=name, config=c, length=int(m["bucket"]), idx=i, answers=m["answers"], output=out, score=ok, frac=frac)
         for b in sorted(per, key=int):
             rows.append({"config": c, "length": int(b), "n": len(per[b]), "accuracy": mean(per[b]), "frac": mean(fr[b])})
         print(f"[niah] {c:>14}: " + " ".join(f"{b}={mean(per[b]):.2f}" for b in sorted(per, key=int)), flush=True)
@@ -258,6 +275,78 @@ def task_speed(E, cfgs, lengths, reps):
     return rows
 
 
+def graph_kind(cfg):
+    """Config -> (prefill.graphs kind, fraction) for the configs that have a graphed version."""
+    s, f, u = parse(cfg)
+    if s in ("big", "small", "hyb"):
+        return s, 0.0
+    if s in ("attn_small", "drop-attn_small") and u == "sent":
+        return ("ours" if s == "attn_small" else "drop"), f
+    if s == "specprefill" and u is None:
+        return "spec", f
+    raise ValueError(f"{cfg}: no graphed version in prefill/graphs.py")
+
+
+def task_speed_allgraph(E, cfgs, lengths, reps):
+    """TTFT with EVERY method's fixed-shape stages replayed as CUDA graphs (prefill/graphs.py; only the selection runs
+    eagerly). At the first length also records max |graphed - eager| / max |eager| of the first-token logits."""
+    rows, check = [], {}
+    g = torch.Generator().manual_seed(0)
+    for T in lengths:
+        ids = torch.randint(1000, 100000, (T,), generator=g).to(E.dev)
+        row = {"prompt_len": T}
+        for c in cfgs:
+            run = None
+            try:
+                kind, f = graph_kind(c)
+                run = build_graphs(E.rh, kind, f, ids)
+                if T == lengths[0]:
+                    eager = E.prefill(c, ids)[2].float()
+                    check[c] = (run(ids).float() - eager).abs().max().item() / eager.abs().max().item()
+                row[c] = time_call(lambda: run(ids), repeats=reps, warmup=2)
+            except torch.OutOfMemoryError:
+                row[c] = None
+            del run
+            gc.collect()
+            torch.cuda.empty_cache()
+        rows.append(row)
+        print(f"[speed_allgraph] {T}: " + " ".join(f"{c}=" + ("OOM" if row[c] is None else f"{row[c]*1e3:.1f}ms") for c in cfgs), flush=True)
+    print(f"[speed_allgraph] graph vs eager logits (rel. max diff): " + " ".join(f"{c}={v:.1e}" for c, v in check.items()), flush=True)
+    return {"rows": rows, "check": check}
+
+
+BREAKDOWN_COLS = [("small", f"{C.SMALL_NAME} prefill"), ("small_scored", f"{C.SMALL_NAME} prefill + 尾部打分"), ("fold", "projector + KV（folded）"),
+                  ("tail", f"{C.LARGE_NAME} 开头 + 尾部"), ("recompute", f"{C.LARGE_NAME} 重算 10% 句子 + 开头 + 尾部"), ("big", f"{C.LARGE_NAME} 单独")]
+
+
+def task_breakdown(E, lengths, reps, frac=0.1):
+    """Where the hybrid's time goes (s), per prompt length; every stage timed on its own with synced inputs."""
+    rh, S, L, dev = E.rh, E.S, E.L, E.dev
+    rows = []
+    g = torch.Generator().manual_seed(0)
+    for T in lengths:
+        ids = torch.randint(1000, 100000, (T,), generator=g).to(dev)
+        s, m, t = split_prompt(T, rh.n_sink, rh.n_tail)
+        hs = rh.stage_small(ids[:s + m])
+        kb, vb = rh.stage_fold(hs[:, s:], s, T)
+        _, score = small_prefill_scored(S, ids, t, s, s + m)
+        idx = choose_units(score, segment_ids(ids[s:s + m], "sent", rh.boundary, rh.cap), int(round(frac * m)))
+        ar = lambda a, b: torch.arange(a, b, device=dev)
+        pos = torch.cat([ar(0, s), s + idx, ar(s + m, T)])
+        row = {"prompt_len": T, "n_recomputed": int(idx.numel()),
+               "small": time_call(lambda: rh.stage_small(ids[:s + m]), reps),
+               "small_scored": time_call(lambda: small_prefill_scored(S, ids, t, s, s + m), reps),
+               "fold": time_call(lambda: rh.stage_fold(hs[:, s:], s, T), reps),
+               "tail": time_call(lambda: rh.stage_tail(ids, kb, vb, s, m), reps),
+               "recompute": time_call(lambda: extend_at(L, ids[pos], pos, kb, vb), reps),
+               "big": time_call(lambda: E.fb.prefill(ids), reps)}
+        rows.append(row)
+        print(f"[breakdown] {T}: " + " ".join(f"{k}={row[k]*1e3:.1f}ms" for k, _ in BREAKDOWN_COLS), flush=True)
+        del hs, kb, vb
+        torch.cuda.empty_cache()
+    return rows
+
+
 # ----------------------------------------------------------------------------------------------- summary
 RULER_GROUPS = {"检索": ["niah_single_1", "niah_single_2", "niah_single_3", "niah_multikey_1", "niah_multikey_2",
                        "niah_multikey_3", "niah_multiquery", "niah_multivalue"],
@@ -275,9 +364,20 @@ def ruler_frac(res, c, L):
     return v[0] if v else None
 
 
-def qa_mean(res, c, b):
-    v = [r["f1"] for r in res.get("qa", []) if r["config"] == c and r["bucket"] == b]
+def qa_mean(res, c, b, key="qa"):
+    v = [r["f1"] for r in res.get(key, []) if r["config"] == c and r["bucket"] == b]
     return mean(v) if v else None
+
+
+def qa_table(res, cfgs, key, buckets):
+    L = ["| 配置 | " + " | ".join(f"{s} {b}" for b in buckets for s in ("squad", "hotpot", "trivia")) + " | " + " | ".join(f"平均 {b}" for b in buckets) + " |",
+         "|---|" + "---|" * (3 * len(buckets) + len(buckets))]
+    for c in cfgs:
+        v = {(r["source"], r["bucket"]): r["f1"] for r in res[key] if r["config"] == c}
+        if v:
+            L.append(f"| {label(c)} | " + " | ".join(fmt(v.get((s, b))) for b in buckets for s in ("squad", "hotpot", "trivia"))
+                     + " | " + " | ".join(fmt(qa_mean(res, c, b, key)) for b in buckets) + " |")
+    return L
 
 
 def niah_mean(res, c):
@@ -318,11 +418,16 @@ def write_summary(res, path):
             L.append(f"| {label(c)} | " + " | ".join(fmt(ruler_mean(res, c, Ln, [t]), "{:.2f}") for t in tasks) + " |")
         L += ["", "</details>"]
     if "qa" in res:
-        L += ["", "## 问答 F1", "", "| 配置 | " + " | ".join(f"{s} {b}" for b in ("4k", "8k") for s in ("squad", "hotpot", "trivia")) + " |", "|---|" + "---|" * 6]
+        L += ["", "## 问答 F1", ""] + qa_table(res, cfgs, "qa", ("4k", "8k"))
+    if "qa_long" in res:
+        L += ["", "## 问答 F1，长 prompt（约 16k / 32k token）", ""] + qa_table(res, cfgs, "qa_long", ("16k", "32k"))
+    if "niah_long" in res:
+        lens = sorted({r["length"] for r in res["niah_long"]})
+        L += ["", "## 大海捞针，长 prompt", "", "| 配置 | " + " | ".join(map(str, lens)) + " |", "|---|" + "---|" * len(lens)]
         for c in cfgs:
-            v = {(r["source"], r["bucket"]): r["f1"] for r in res["qa"] if r["config"] == c}
+            v = {r["length"]: r["accuracy"] for r in res["niah_long"] if r["config"] == c}
             if v:
-                L.append(f"| {label(c)} | " + " | ".join(fmt(v.get((s, b))) for b in ("4k", "8k") for s in ("squad", "hotpot", "trivia")) + " |")
+                L.append(f"| {label(c)} | " + " | ".join(fmt(v.get(x), "{:.2f}") for x in lens) + " |")
     if "gsm8k" in res:
         L += ["", "## GSM8K（8-shot，对话轮次形式）", "", "| 配置 | 准确率 | 遵守 #### 格式 |", "|---|---|---|"]
         L += [f"| {label(r['config'])} | {r['accuracy']:.3f} | {r['format_follow']:.3f} |" for r in res["gsm8k"]]
@@ -334,12 +439,30 @@ def write_summary(res, path):
                 L.append(f"| {label(c)} | " + " | ".join(f"{v[b]['exact_match']:.3f} | {v[b]['similarity']:.3f}" if b in v else "- | -" for b in ("4k", "8k")) + " |")
     if "speed" in res:
         sc = [c for c in res["speed"][0] if c != "prompt_len"]
-        L += ["", f"## 首 token 延迟（毫秒，{res['meta']['gpu'].replace('NVIDIA ', '')}，eager，不含 CUDA graph）", "", "| 配置 | " + " | ".join(str(r["prompt_len"]) for r in res["speed"]) + " |",
-              "|---|" + "---|" * len(res["speed"])]
+        graph = res["meta"]["args"].get("speed_graph")
+        L += ["", f"## 首 token 延迟（毫秒，{res['meta']['gpu'].replace('NVIDIA ', '')}，eager" + ("；SpecPrefill 的 look-ahead 用 CUDA graph 回放）" if graph else "，不含 CUDA graph）"),
+              "", "| 配置 | " + " | ".join(str(r["prompt_len"]) for r in res["speed"]) + " |", "|---|" + "---|" * len(res["speed"])]
         for c in sc:
             L.append(f"| {label(c)} | " + " | ".join("显存不足" if r.get(c) is None else f"{r[c]*1e3:.1f}" + (f"（{r['big']/r[c]:.2f} 倍）" if r.get("big") else "")
                                                    for r in res["speed"]) + " |")
         L += ["", f"括号内是相对 {C.LARGE_NAME} 单独的加速比。"]
+    if "speed_allgraph" in res:
+        rows, chk = res["speed_allgraph"]["rows"], res["speed_allgraph"]["check"]
+        sc = [c for c in rows[0] if c != "prompt_len"]
+        L += ["", f"## 首 token 延迟（毫秒，{res['meta']['gpu'].replace('NVIDIA ', '')}，所有方法都用 CUDA graph：固定形状的阶段整段回放，只有选择步骤 eager）",
+              "", "| 配置 | " + " | ".join(str(r["prompt_len"]) for r in rows) + " |", "|---|" + "---|" * len(rows)]
+        for c in sc:
+            L.append(f"| {label(c)} | " + " | ".join("显存不足" if r.get(c) is None else f"{r[c]*1e3:.1f}" + (f"（{r['big']/r[c]:.2f} 倍）" if r.get("big") else "")
+                                                   for r in rows) + " |")
+        L += ["", f"括号内是相对 {C.LARGE_NAME} 单独（同样用 CUDA graph）的加速比。graph 与 eager 的首 token logits 最大相对差（{rows[0]['prompt_len']} token）："
+              + "，".join(f"{label(c)} {v:.1e}" for c, v in chk.items()) + "。"]
+    if "breakdown" in res:
+        L += ["", f"## 混合方案各阶段耗时（毫秒，{res['meta']['gpu'].replace('NVIDIA ', '')}，eager）", "",
+              "每个阶段单独计时。“不重算”的首 token 时间 ≈ 小模型 prefill + projector + 开头/尾部；“重算 10%”≈ 小模型 prefill + 尾部打分 + projector + 重算调用。", "",
+              "| 阶段 | " + " | ".join(str(r["prompt_len"]) for r in res["breakdown"]) + " |", "|---|" + "---|" * len(res["breakdown"])]
+        for k, name in BREAKDOWN_COLS:
+            L.append(f"| {name} | " + " | ".join(f"{r[k]*1e3:.1f}" for r in res["breakdown"]) + " |")
+        L.append("| 重算的 token 数 | " + " | ".join(str(r["n_recomputed"]) for r in res["breakdown"]) + " |")
     open(path, "w").write("\n".join(L) + "\n")
 
 
@@ -460,6 +583,8 @@ def main():
     ap.add_argument("--n_code", type=int, default=100)
     ap.add_argument("--speed_lengths", default="4096,8192,16384,32768")
     ap.add_argument("--speed_reps", type=int, default=5)
+    ap.add_argument("--speed_graph", action="store_true", help="CUDA-graph SpecPrefill's look-ahead steps in the speed task")
+    ap.add_argument("--n_qa_long", type=int, default=40)
     ap.add_argument("--n_sink", type=int, default=8)
     ap.add_argument("--n_tail", type=int, default=64)
     ap.add_argument("--out_dir", default=os.path.join(C.RESULTS_DIR, "recompute"))
@@ -497,8 +622,20 @@ def main():
         elif task == "code":
             res["code"] = task_code(V2Adapter(E), cfgs, a.n_code)
         elif task == "speed":
+            E.rh.lah_graph = a.speed_graph
             res["speed"] = task_speed(E, [c for c in a.speed_configs.split(",") if c],
                                       [int(x) for x in a.speed_lengths.split(",")], a.speed_reps)
+            E.rh.lah_graph = False
+            E.rh.lah(0, 0)  # frees the cached graph
+        elif task == "speed_allgraph":
+            res["speed_allgraph"] = task_speed_allgraph(E, [c for c in a.speed_configs.split(",") if c],
+                                                        [int(x) for x in a.speed_lengths.split(",")], a.speed_reps)
+        elif task == "breakdown":
+            res["breakdown"] = task_breakdown(E, [int(x) for x in a.speed_lengths.split(",")], a.speed_reps)
+        elif task == "qa_long":
+            res["qa_long"] = task_qa(E, cfgs, a.n_qa_long, log, pool="qa_eval_long", name="qa_long")
+        elif task == "niah_long":
+            res["niah_long"] = task_niah(E, cfgs, log, pool="niah_eval_long", name="niah_long")
         print(f"[task {task}] {(time.time()-t0)/60:.1f} min", flush=True)
         json.dump(res, open(res_path, "w"), indent=1)
         try:  # a plotting problem must never stop the evaluation

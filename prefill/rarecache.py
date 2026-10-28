@@ -124,20 +124,26 @@ def calibrate(S, L, prompts, sigma, stride=1, seed=0, log_every=0):
 class RaReCache:
     """Inference with a fitted map: source prefill -> mapped target cache + rank-disagreement scores -> recompute."""
 
-    def __init__(self, S, L, fit, chunk=8192):
+    def __init__(self, S, L, fit, chunk=8192, fp32=False):
         dev, dt = L.embed.device, L.embed.dtype
-        self.S, self.L, self.chunk = S, L, chunk
+        self.S, self.L, self.chunk, self.fp32 = S, L, chunk, fp32
         self.meta = fit.get("cfg", {})
-        load = lambda m: [dict(src=torch.tensor(e["src"], device=dev), W=e["W"].to(dev, dt), xbar=e["xbar"].to(dev, dt),
-                               ybar=e["ybar"].to(dev, dt), Vr=e["Vr"].to(dev, torch.float32)) for e in m]
+        # W is stored in bf16 by fit_rarecache.py; xbar / ybar / Vr are kept in fp32 so the fp32 path is exact up to W
+        load = lambda m: [dict(src=torch.tensor(e["src"], device=dev), W=e["W"].to(dev, dt), xbar=e["xbar"].to(dev, torch.float32),
+                               ybar=e["ybar"].to(dev, torch.float32), Vr=e["Vr"].to(dev, torch.float32)) for e in m]
         self.k, self.v = load(fit["k"]), load(fit["v"])
 
     def _map(self, e, rows, c0, c1):
-        """rows [Ls, T, d_s] -> (prediction [n, d_t], rank-disagreement score [n] fp32) for positions c0:c1."""
+        """rows [Ls, T, d_s] -> (prediction [n, d_t] in the model dtype, rank-disagreement score [n] fp32) for positions
+        c0:c1. fp32=True centres and multiplies in fp32 (diagnostic: isolates bf16 rounding of x - xbar and the matmul)."""
         x = rows[e["src"], c0:c1].transpose(0, 1).reshape(c1 - c0, -1)
-        z = (x - e["xbar"]) @ e["W"]
+        dt = x.dtype
+        if self.fp32:
+            z = (x.float() - e["xbar"]) @ e["W"].float()
+        else:
+            z = (x - e["xbar"].to(dt)) @ e["W"]
         zf = z.float()
-        return z + e["ybar"], zf.pow(2).sum(-1) - (zf @ e["Vr"]).pow(2).sum(-1)
+        return (zf + e["ybar"]).to(dt), zf.pow(2).sum(-1) - (zf @ e["Vr"]).pow(2).sum(-1)
 
     @torch.no_grad()
     def map_cache(self, ids):
@@ -159,14 +165,19 @@ class RaReCache:
         return kbuf, vbuf, score
 
     @torch.no_grad()
-    def prefill(self, ids, rho):
-        """-> (kbuf, vbuf, first-token logits, number of prompt positions run by the target incl. the last token)."""
+    def prefill(self, ids, rho, n_sink=0, n_tail=0):
+        """-> (kbuf, vbuf, first-token logits, number of prompt positions run by the target incl. the last token).
+        n_sink / n_tail > 0 additionally force the first / last positions to be recomputed (our hybrid's sink + tail;
+        not part of the paper, diagnostic), on top of the ceil(rho T) top-scoring ones."""
         T = ids.shape[0]
         kbuf, vbuf, score = self.map_cache(ids)
         sel = torch.zeros(T, dtype=torch.bool, device=ids.device)
         n = min(T, math.ceil(rho * T))
         if n:
             sel[torch.topk(score, n).indices] = True
+        sel[:n_sink] = True
+        if n_tail:
+            sel[max(0, T - n_tail):] = True
         sel[T - 1] = True
         pos = torch.nonzero(sel).flatten()
         logits, _ = extend_at(self.L, ids[pos], pos, kbuf, vbuf)

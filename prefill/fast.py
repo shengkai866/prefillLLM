@@ -284,10 +284,12 @@ class FastHybrid:
 
 class Graphed:
     """Capture fn(*inputs) as a CUDA graph for the given static shapes; call with same-shaped inputs to replay.
-    Outputs are views into graph-owned memory and are overwritten by the next replay."""
+    Outputs are views into graph-owned memory and are overwritten by the next replay.
+    copy_inputs=False uses the example tensors themselves as the static inputs (no clone): passing the same tensor
+    again costs nothing, e.g. another graph's output that is chained into this one."""
 
-    def __init__(self, fn, *example_inputs, warmup=2):
-        self.static_in = [x.clone() for x in example_inputs]
+    def __init__(self, fn, *example_inputs, warmup=2, copy_inputs=True):
+        self.static_in = [x.clone() if copy_inputs else x for x in example_inputs]
         s = torch.cuda.Stream()
         s.wait_stream(torch.cuda.current_stream())
         with torch.cuda.stream(s):
