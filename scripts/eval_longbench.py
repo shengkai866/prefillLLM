@@ -93,7 +93,7 @@ def task_longbench(E, name, cfgs, n, max_len, min_words, max_gen, log):
     items = []
     for x in rows_in:
         text = truncate_middle(E, PROMPT[name].format(context=x["context"], input=x["input"]), max_len)
-        ids = E.chat_ids([{"role": "user", "content": text}]) if name in CHAT else E.T.enc(text)
+        ids = E.chat_ids([{"role": "user", "content": text}]) if name in CHAT else E.T.raw(text)
         items.append((x["_id"], ids, x["answers"]))
     rows = []
     for c in cfgs:

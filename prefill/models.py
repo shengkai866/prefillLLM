@@ -36,8 +36,8 @@ def new_projector(small, large, d_mid=2048, rank=256, in_norm=False):
 
 def eos_ids(tok):
     ids = {tok.eos_token_id}
-    for t in ("<|im_end|>", "<|endoftext|>"):
-        i = tok.convert_tokens_to_ids(t)
-        if i is not None and i >= 0:
-            ids.add(i)
+    vocab = tok.get_vocab()
+    for t in ("<|im_end|>", "<|endoftext|>", "<|eot_id|>", "<|eom_id|>", "<|end_of_text|>"):  # Qwen3, Llama 3
+        if t in vocab:
+            ids.add(vocab[t])
     return tuple(i for i in ids if i is not None)

@@ -218,10 +218,18 @@ def task_ruler(E, cfgs, n_per_task, lengths, log):
     return rows
 
 
-def task_qa(E, cfgs, n, log, pool="qa_eval", name="qa"):
+def bucket_tokens(b):
+    """'16k' -> 16384, '32768' -> 32768 (qa pools name buckets by k, niah pools by token count)."""
+    b = str(b)
+    return int(b[:-1]) * 1024 if b.endswith("k") else int(b)
+
+
+def task_qa(E, cfgs, n, log, pool="qa_eval", name="qa", max_bucket=0):
     pool = PromptPool(pool)
     cells = collections.defaultdict(list)
     for i, m in enumerate(pool.meta):
+        if max_bucket and bucket_tokens(m["bucket"]) > max_bucket:
+            continue
         cells[(m["source"], m["bucket"])].append(i)
     rows = []
     for c in cfgs:
@@ -241,12 +249,14 @@ def task_qa(E, cfgs, n, log, pool="qa_eval", name="qa"):
     return rows
 
 
-def task_niah(E, cfgs, log, pool="niah_eval", name="niah"):
+def task_niah(E, cfgs, log, pool="niah_eval", name="niah", max_bucket=0):
     pool = PromptPool(pool)
     rows = []
     for c in cfgs:
         per, fr = collections.defaultdict(list), collections.defaultdict(list)
         for i, m in enumerate(pool.meta):
+            if max_bucket and bucket_tokens(m["bucket"]) > max_bucket:
+                continue
             out, frac = E.generate(c, pool.ids(i), 16, m["answers"])
             ok = float(m["answers"][0] in out)
             per[m["bucket"]].append(ok)
@@ -585,6 +595,8 @@ def main():
     ap.add_argument("--speed_reps", type=int, default=5)
     ap.add_argument("--speed_graph", action="store_true", help="CUDA-graph SpecPrefill's look-ahead steps in the speed task")
     ap.add_argument("--n_qa_long", type=int, default=40)
+    ap.add_argument("--long_max", type=int, default=0, help="qa_long / niah_long: skip buckets above this many tokens "
+                    "(e.g. 16384 for a 32B target that does not fit 32k on one GPU); 0 = all")
     ap.add_argument("--n_sink", type=int, default=8)
     ap.add_argument("--n_tail", type=int, default=64)
     ap.add_argument("--out_dir", default=os.path.join(C.RESULTS_DIR, "recompute"))
@@ -633,9 +645,9 @@ def main():
         elif task == "breakdown":
             res["breakdown"] = task_breakdown(E, [int(x) for x in a.speed_lengths.split(",")], a.speed_reps)
         elif task == "qa_long":
-            res["qa_long"] = task_qa(E, cfgs, a.n_qa_long, log, pool="qa_eval_long", name="qa_long")
+            res["qa_long"] = task_qa(E, cfgs, a.n_qa_long, log, pool="qa_eval_long", name="qa_long", max_bucket=a.long_max)
         elif task == "niah_long":
-            res["niah_long"] = task_niah(E, cfgs, log, pool="niah_eval_long", name="niah_long")
+            res["niah_long"] = task_niah(E, cfgs, log, pool="niah_eval_long", name="niah_long", max_bucket=a.long_max)
         print(f"[task {task}] {(time.time()-t0)/60:.1f} min", flush=True)
         json.dump(res, open(res_path, "w"), indent=1)
         try:  # a plotting problem must never stop the evaluation

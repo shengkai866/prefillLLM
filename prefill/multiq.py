@@ -15,6 +15,11 @@ Configs (MultiQ.doc builds the state, MultiQ.ask answers one question from it):
                        rows do not persist)
   ours-acc:f[:unit]    same, but recomputed rows persist in the shared cache and later questions pick NEW units
                        (progressive refinement; the fraction f is per question)
+  pre:f:unit[:g]       question-agnostic recompute at DOCUMENT time: the small model's attention from the last n_tail
+                       document tokens scores the middle, the top f units are recomputed by the large model together with
+                       sink and tail (one call, like the single-prompt pipeline). Per question: g = 0 -> the question just
+                       extends the cache (as cheap as hyb / big); g > 0 -> additionally g of NEW units, scored with the
+                       question, are recomputed and persist (as ours-acc). Moves the recompute cost out of the questions.
   spec-agn:f           SpecPrefill without the question: look-ahead from the end of the document, keep f of the chunks,
                        the compact cache answers every question
   spec-q1:f            SpecPrefill scored with the FIRST question (prompt = document + q1); document chunks kept by that
@@ -30,7 +35,7 @@ from .fast import kv_to_dynamic_cache
 from .kv import greedy_decode, split_prompt
 from .recompute import choose_units, extend_at, prefill_kept, segment_ids, spec_importance, spec_select
 
-METHODS = ("big", "small", "hyb", "ours", "ours-acc", "spec-agn", "spec-q1", "spec-each", "ours-each")
+METHODS = ("big", "small", "hyb", "ours", "ours-acc", "pre", "spec-agn", "spec-q1", "spec-each", "ours-each")
 
 
 def parse_cfg(cfg):
@@ -40,6 +45,12 @@ def parse_cfg(cfg):
     f = float(rest[0]) if rest else 0.0
     u = rest[1] if len(rest) > 1 else None
     return s, f, (None if u is None else u if u == "sent" else int(u[1:]))
+
+
+def per_question_frac(cfg):
+    """pre:f:unit:g -> g (fraction of the middle recomputed per question on top of the document-time f), else 0."""
+    rest = cfg.split(":")[1:]
+    return float(rest[2]) if len(rest) > 2 else 0.0
 
 
 def with_room(kb, vb, extra):
@@ -70,7 +81,7 @@ class MultiQ:
         elif meth == "hyb":
             kb, vb, _ = self.rh.prefill(ids)
             st["kb"], st["vb"] = with_room(kb, vb, self.q_max)
-        elif meth in ("ours", "ours-acc"):
+        elif meth in ("ours", "ours-acc", "pre"):
             # one small-model pass gives both its own cache (for scoring the questions later) and the hidden states
             # for the projector; then the same fold + sink/tail call as FastHybrid.prefill
             s, m, _ = split_prompt(T, self.rh.n_sink, self.rh.n_tail)
@@ -78,11 +89,26 @@ class MultiQ:
             vs = torch.zeros_like(ks)
             _, hs = S.prefill(ids, ks, vs, collect=True, logits=False)
             kb, vb = self.rh.stage_fold(hs[:, s:s + m], s, T)
-            self.rh.stage_tail(ids, kb, vb, s, m)
+            unit = None if u is None else segment_ids(ids[s:s + m], u, self.rh.boundary, self.rh.cap)
+            done = torch.zeros(m, dtype=torch.bool, device=ids.device)
+            k = min(m, int(round(f * m)))
+            if meth == "pre":
+                if k > 0:  # score the middle with the small model's last document tokens (no question yet)
+                    t = T - s - m
+                    tpos = torch.arange(s + m, T, device=ids.device)
+                    _, score = extend_at(S, ids[s + m:], tpos, ks, vs, n_q=t, lo=s, hi=s + m)
+                    idx = choose_units(score, unit, k) if unit is not None else torch.topk(score, k).indices.sort().values
+                    done[idx] = True
+                    ar = lambda a, b: torch.arange(a, b, device=ids.device)
+                    pos = torch.cat([ar(0, s), s + idx, ar(s + m, T)])
+                    extend_at(L, ids[pos], pos, kb, vb)  # sink + chosen + tail in one call, tail sees the fixes
+                else:
+                    self.rh.stage_tail(ids, kb, vb, s, m)
+                k = min(m, int(round(per_question_frac(cfg) * m)))
+            else:
+                self.rh.stage_tail(ids, kb, vb, s, m)
             st["kb"], st["vb"] = with_room(kb, vb, self.q_max)
-            st.update(ks=ks, vs=vs, s=s, m=m, k=min(m, int(round(f * m))),
-                      unit=None if u is None else segment_ids(ids[s:s + m], u, self.rh.boundary, self.rh.cap),
-                      done=torch.zeros(m, dtype=torch.bool, device=ids.device))
+            st.update(ks=ks, vs=vs, s=s, m=m, k=k, unit=unit, done=done)
         elif meth == "spec-agn":
             _, imp = spec_importance(S, ids, self.rh.n_lah, self.rh.eos, self.rh.spec_kernel)
             self._keep(st, spec_select(imp, f, self.rh.spec_chunk))
@@ -107,7 +133,10 @@ class MultiQ:
             M = self.S if meth == "small" else self.L
             lg, _ = extend_at(M, q_ids, qpos, st["kb"], st["vb"])
             return st["kb"][:, :, :T + Q], st["vb"][:, :, :T + Q], lg, 1.0 if meth == "big" else 0.0, None
-        if meth in ("ours", "ours-acc"):
+        if meth == "pre" and st["k"] == 0:  # everything was done at document time
+            lg, _ = extend_at(self.L, q_ids, qpos, st["kb"], st["vb"])
+            return st["kb"][:, :, :T + Q], st["vb"][:, :, :T + Q], lg, 0.0, None
+        if meth in ("ours", "ours-acc", "pre"):
             s, m, k = st["s"], st["m"], st["k"]
             _, score = extend_at(self.S, q_ids, qpos, st["ks"], st["vs"], n_q=Q, lo=s, hi=s + m)
             if meth == "ours":
@@ -115,13 +144,13 @@ class MultiQ:
             else:
                 kb, vb = st["kb"], st["vb"]
                 score = score.masked_fill(st["done"], float("-inf"))
-            if k == 0 or (meth == "ours-acc" and bool(st["done"].all())):
+            if k == 0 or (meth != "ours" and bool(st["done"].all())):
                 idx = torch.arange(0, device=dev)
             elif st["unit"] is not None:
                 idx = choose_units(score, st["unit"], k)
             else:
                 idx = torch.topk(score, k).indices.sort().values
-            if meth == "ours-acc":
+            if meth != "ours":
                 st["done"][idx] = True
             pos = torch.cat([s + idx, qpos])
             lg, _ = extend_at(self.L, torch.cat([st["ids"][s + idx], q_ids]), pos, kb, vb)

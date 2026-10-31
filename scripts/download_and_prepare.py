@@ -18,6 +18,8 @@ from datasets import load_dataset  # noqa: E402
 from huggingface_hub import snapshot_download  # noqa: E402
 from transformers import AutoTokenizer  # noqa: E402
 
+from prefill.mixdata import raw_bos  # noqa: E402
+
 from prefill.data import save_store  # noqa: E402
 
 
@@ -41,12 +43,13 @@ def prepare_text(name, tok, n_train, n_test, min_tokens, max_tokens, batch=64):
     ds = load_dataset(repo, cfg, split="train", streaming=True)
     ds = ds.shuffle(seed=0, buffer_size=5000)
     seqs, buf, seen, t0 = [], [], 0, time.time()
+    bos = raw_bos(tok)
     need = n_train + n_test
     for ex in ds:
         buf.append(ex[field])
         if len(buf) < batch:
             continue
-        enc = tok(buf, add_special_tokens=False)["input_ids"]
+        enc = [bos + x for x in tok(buf, add_special_tokens=False)["input_ids"]]  # bos: [] for Qwen3
         buf = []
         seen += batch
         for ids in enc:

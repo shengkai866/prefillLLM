@@ -65,12 +65,23 @@ class PromptPool:
 
 
 # ------------------------------------------------------------------------------------------------ helpers
+def raw_bos(tok):
+    """[BOS] for tokenizers whose models expect it at the start of every sequence (Llama 3: <|begin_of_text|>, which
+    its chat template also emits), [] otherwise (Qwen3 has no BOS). Prepended to raw (non-chat) prompts."""
+    return [tok.bos_token_id] if tok.bos_token_id is not None else []
+
+
 class Tok:
     def __init__(self, tok):
         self.tok = tok
+        self.bos = raw_bos(tok)
 
     def enc(self, text):
         return self.tok(text, add_special_tokens=False)["input_ids"]
+
+    def raw(self, text):
+        """Token ids of a raw (non-chat) prompt: BOS (if the model uses one) + text."""
+        return self.bos + self.enc(text)
 
     def n(self, text):
         return len(self.enc(text))
@@ -168,7 +179,10 @@ class Builders:
         cands = [d for d in self.rng.sample(self.web_docs, min(200, len(self.web_docs))) if len(d) >= L]
         if not cands:
             return None
-        return {"ids": list(cands[0][:L]), "type": "web", "source": "web", "fmt": "raw"}
+        d = list(cands[0])
+        if self.T.bos and d[:1] == self.T.bos:  # stage-1 stores already start with BOS, web_long does not
+            d = d[1:]
+        return {"ids": self.T.bos + d[:L - len(self.T.bos)], "type": "web", "source": "web", "fmt": "raw"}
 
     # -- extractive QA (chat)
     def _qa_prompt(self, docs_text, question):
@@ -218,7 +232,7 @@ class Builders:
         return "".join(parts)
 
     def code(self, L):
-        ids = self.T.enc(self._code_text(L + 50))
+        ids = self.T.raw(self._code_text(L + 50))
         if len(ids) < L:
             return None
         return {"ids": ids[:L], "type": "code", "source": "codeparrot", "fmt": "raw"}
@@ -240,7 +254,7 @@ class Builders:
         if cut is None:
             return None
         prompt = "\n".join(lines[:cut]) + "\n"
-        ids = self.T.enc(prompt)
+        ids = self.T.raw(prompt)
         if len(ids) > L:
             return None
         return {"ids": ids, "type": "code_nextline", "source": "codeparrot", "fmt": "raw", "target": lines[cut].strip()}

@@ -47,7 +47,8 @@ def layer_kv(large, layer_idx, h, cos, sin):
     d = layer.input_layernorm.weight.device  # multi-GPU large model: compute on this layer's GPU
     h, cos, sin = h.to(d), cos.to(d), sin.to(d)
     x = layer.input_layernorm(h.to(layer.input_layernorm.weight.dtype))
-    k = attn.k_norm(attn.k_proj(x).view(B, T, -1, attn.head_dim)).transpose(1, 2)
+    k = attn.k_proj(x).view(B, T, -1, attn.head_dim)
+    k = (attn.k_norm(k) if hasattr(attn, "k_norm") else k).transpose(1, 2)  # Llama has no q/k norm
     v = attn.v_proj(x).view(B, T, -1, attn.head_dim).transpose(1, 2)
     c, s = cos.unsqueeze(1), sin.unsqueeze(1)
     k = (k * c) + (rotate_half(k) * s)
@@ -62,7 +63,8 @@ def layer_q(large, layer_idx, h, cos, sin):
     d = layer.input_layernorm.weight.device
     h, cos, sin = h.to(d), cos.to(d), sin.to(d)
     x = layer.input_layernorm(h.to(layer.input_layernorm.weight.dtype))
-    q = attn.q_norm(attn.q_proj(x).view(B, T, -1, attn.head_dim)).transpose(1, 2)
+    q = attn.q_proj(x).view(B, T, -1, attn.head_dim)
+    q = (attn.q_norm(q) if hasattr(attn, "q_norm") else q).transpose(1, 2)
     c, s = cos.unsqueeze(1), sin.unsqueeze(1)
     return (q * c) + (rotate_half(q) * s)
 

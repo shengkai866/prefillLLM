@@ -28,7 +28,7 @@ from prefill import config as C  # noqa: E402
 from prefill.fast import time_call  # noqa: E402
 from prefill.mixdata import PromptPool  # noqa: E402
 from prefill.models import load_pair  # noqa: E402
-from prefill.multiq import MultiQ, parse_cfg  # noqa: E402
+from prefill.multiq import MultiQ, parse_cfg, per_question_frac  # noqa: E402
 
 DEFAULT_CFGS = ["big", "small", "hyb", "ours:0.1:sent", "ours-acc:0.1:sent", "ours-each:0.1:sent",
                 "spec-agn:0.1", "spec-agn:0.2", "spec-agn:0.3", "spec-q1:0.1", "spec-q1:0.2", "spec-each:0.1"]
@@ -37,15 +37,21 @@ SPEED_CFGS = ["big", "hyb", "ours:0.1:sent", "ours-each:0.1:sent", "spec-agn:0.1
 
 def label(cfg):
     s, f, u = parse_cfg(cfg)
+    g = per_question_frac(cfg)
     unit = "" if u is None else "，按句子" if u == "sent" else f"，{u} token 一块"
     return {"big": f"{C.LARGE_NAME} 单独（缓存复用）", "small": f"{C.SMALL_NAME} 单独（缓存复用）", "hyb": "投影缓存，不重算",
             "ours": f"投影缓存 + 每问重算 {f:.0%}{unit}（不保留）", "ours-acc": f"投影缓存 + 每问重算 {f:.0%}{unit}（累积保留）",
+            "pre": f"投影缓存 + 文档阶段重算 {f:.0%}{unit}" + (f" + 每问补 {g:.0%}（累积）" if g else "（每问不重算）"),
             "ours-each": f"我们，每问重新 prefill，重算 {f:.0%}{unit}", "spec-agn": f"SpecPrefill 不看问题，保留 {f:.0%}",
             "spec-q1": f"SpecPrefill 按第 1 问选择，保留 {f:.0%}", "spec-each": f"SpecPrefill 每问重新 prefill，保留 {f:.0%}"}[s]
 
 
-def task_qa(mq, tok, cfgs, dev, log, max_new=32):
-    pool = PromptPool("multiq_eval")
+QBINS = ((1, 1), (2, 5), (6, 10), (11, 20))  # question index ranges (1-based) reported for long question sequences
+
+
+def task_qa(mq, tok, cfgs, dev, log, max_new=32, pool="multiq_eval"):
+    pool = PromptPool(pool)
+    long_seq = max(len(m["questions"]) for m in pool.meta) > 5
     rows = []
     for c in cfgs:
         t0 = time.time()
@@ -59,6 +65,9 @@ def task_qa(mq, tok, cfgs, dev, log, max_new=32):
                 for key in ("f1", "em", "contains"):
                     acc[(m["bucket"], "all")][key].append(r[key])
                     acc[(m["bucket"], "q1" if j == 0 else "later")][key].append(r[key])
+                    if long_seq:
+                        lo, hi = next(bn for bn in QBINS if bn[0] <= j + 1 <= bn[1])
+                        acc[(m["bucket"], f"q{lo}-{hi}")][key].append(r[key])
                 acc[(m["bucket"], "all")]["frac"].append(frac)
                 log(task="qa", config=c, bucket=m["bucket"], doc=i, q=j, question=q["question"], answers=q["answers"], output=text, frac=frac, **r)
             del st
@@ -72,12 +81,15 @@ def task_qa(mq, tok, cfgs, dev, log, max_new=32):
     return rows
 
 
-def task_speed(mq, cfgs, dev, lengths, reps, n_qtok=40):
+def task_speed(mq, cfgs, dev, lengths, reps, n_qtok=40, n_seq=0):
+    """n_seq > 0: also time a sequence of n_seq different questions on one document cache (cumulative configs get
+    cheaper / change as their cache fills), twice, element-wise mean -> row[c]["seq"] [n_seq] seconds."""
     rows = []
     g = torch.Generator().manual_seed(0)
     for T in lengths:
         ids = torch.randint(1000, 100000, (T,), generator=g).to(dev)
         q = torch.randint(1000, 100000, (n_qtok,), generator=g).to(dev)
+        qseq = [torch.randint(1000, 100000, (n_qtok,), generator=g).to(dev) for _ in range(n_seq)]
         row = {"prompt_len": T}
         for c in cfgs:
             try:
@@ -91,6 +103,19 @@ def task_speed(mq, cfgs, dev, lengths, reps, n_qtok=40):
                 t_later = time_call(lambda: mq.ask_prefill(st, q), repeats=reps, warmup=1)
                 row[c] = {"doc": t_doc, "first": t_first, "later": t_later}
                 del st
+                if n_seq:
+                    runs = []
+                    for _ in range(2):
+                        st, ts = mq.doc(c, ids), []
+                        for qq in qseq:
+                            torch.cuda.synchronize()
+                            t0 = time.perf_counter()
+                            mq.ask_prefill(st, qq)
+                            torch.cuda.synchronize()
+                            ts.append(time.perf_counter() - t0)
+                        runs.append(ts)
+                        del st
+                    row[c]["seq"] = [(x + y) / 2 for x, y in zip(*runs)]
             except torch.OutOfMemoryError:
                 row[c] = None
             torch.cuda.empty_cache()
@@ -116,6 +141,13 @@ def write_summary(res, path):
             L.append(f"| {label(c)} | {fmt(fr, '{:.1%}')} | " + " | ".join(fmt(get(c, b, p, "f1")) for b in ("4k", "8k") for p in ("all", "q1", "later"))
                      + f" | {fmt(get(c, '4k', 'all', 'contains'))} | {fmt(get(c, '8k', 'all', 'contains'))} |")
         L += ["", "“大模型计算比例”：我们 = 每个问题重算的中间 token 比例；SpecPrefill = 保留的文档 token 比例（8k）。"]
+        bins = [f"q{lo}-{hi}" for lo, hi in QBINS if any(r["part"] == f"q{lo}-{hi}" for r in res["qa"])]
+        if bins:
+            L += ["", "### 按问题序号的 F1（第几个问题；缓存累积的配置越往后缓存越完整）", "",
+                  "| 配置 | " + " | ".join(f"{b} {x}" for b in ("4k", "8k") for x in bins) + " |", "|---|" + "---|" * (2 * len(bins))]
+            for c in cfgs:
+                if get(c, "4k", "all", "f1") is not None:
+                    L.append(f"| {label(c)} | " + " | ".join(fmt(get(c, b, x, "f1")) for b in ("4k", "8k") for x in bins) + " |")
     if "speed" in res:
         sc = [c for c in res["speed"][0] if c != "prompt_len"]
         L += ["", f"## 延迟（毫秒，{res['meta']['gpu'].replace('NVIDIA ', '')}，eager）", "",
@@ -129,6 +161,16 @@ def write_summary(res, path):
         for c in sc:
             L.append(f"| {label(c)} | " + " | ".join("-" if r.get(c) is None else f"{tot(r[c])*1e3:.0f}（{tot(r['big'])/tot(r[c]):.2f}）" for r in res["speed"]) + " |")
         L += ["", f"括号内：相对 {C.LARGE_NAME} 单独（缓存复用）的加速比，按“文档 prefill + 5 个问题的首 token”总时间算。"]
+        if all("seq" in r[c] for r in res["speed"] for c in sc if r.get(c)):
+            ns = [n for n in (1, 5, 10, 15, 20) if n <= len(res["speed"][0]["big"]["seq"])]
+            L += ["", f"### 连续 N 个不同问题的总时间（文档 prefill + N 个问题的首 token，毫秒；括号内相对 {C.LARGE_NAME} 复用缓存的加速比）", ""]
+            for r in res["speed"]:
+                tot = lambda v, n: v["doc"] + sum(v["seq"][:n])
+                L += [f"**{r['prompt_len']} token**", "", "| 配置 | " + " | ".join(f"{n} 问" for n in ns) + " |", "|---|" + "---|" * len(ns)]
+                for c in sc:
+                    if r.get(c):
+                        L.append(f"| {label(c)} | " + " | ".join(f"{tot(r[c], n)*1e3:.0f}（{tot(r['big'], n)/tot(r[c], n):.2f}）" for n in ns) + " |")
+                L.append("")
     open(path, "w").write("\n".join(L) + "\n")
 
 
@@ -140,6 +182,8 @@ def main():
     ap.add_argument("--tasks", default="qa,speed")
     ap.add_argument("--speed_lengths", default="4096,8192,16384")
     ap.add_argument("--speed_reps", type=int, default=5)
+    ap.add_argument("--speed_nq", type=int, default=0, help="also time a sequence of this many questions per document")
+    ap.add_argument("--pool", default="multiq_eval")
     ap.add_argument("--n_sink", type=int, default=8)
     ap.add_argument("--n_tail", type=int, default=64)
     ap.add_argument("--q_max", type=int, default=128)
@@ -170,10 +214,11 @@ def main():
             continue
         t0 = time.time()
         if task == "qa":
-            res["qa"] = keep + task_qa(mq, tok, todo, dev, log)
+            res["qa"] = keep + task_qa(mq, tok, todo, dev, log, pool=a.pool)
             res["qa"].sort(key=lambda r: cfgs.index(r["config"]) if r["config"] in cfgs else 99)
         elif task == "speed":
-            res["speed"] = task_speed(mq, [c for c in a.speed_configs.split(",") if c], dev, [int(x) for x in a.speed_lengths.split(",")], a.speed_reps)
+            res["speed"] = task_speed(mq, [c for c in a.speed_configs.split(",") if c], dev, [int(x) for x in a.speed_lengths.split(",")], a.speed_reps,
+                                      n_seq=a.speed_nq)
         print(f"[task {task}] {(time.time()-t0)/60:.1f} min", flush=True)
         json.dump(res, open(res_path, "w"), indent=1)
         write_summary(res, os.path.join(a.out_dir, "summary.md"))

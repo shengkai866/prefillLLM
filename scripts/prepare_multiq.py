@@ -5,7 +5,8 @@ Shared-document multi-question evaluation pool (CPU): `multiq_eval`.
 Each prompt is a document set built like qa_eval's SQuAD prompts (scripts/prepare_mix.py): 3 gold SQuAD v2 validation
 paragraphs that each have >= 2 answerable questions, padded with distractor paragraphs to ~3.5k / ~7.5k tokens and
 shuffled. Up to 5 questions per document set (<= 2 per gold paragraph), so the answers sit in different places of the
-context and no single question-specific selection covers all of them.
+context and no single question-specific selection covers all of them. Long question sequences:
+  --n_gold 10 --n_q 20 --name multiq_eval20   (20 questions over 10 gold paragraphs)
 Stored ids = the shared prefix (chat template start + instruction + documents + "\n\n"); every question's own ids
 ("Question: ..." + end of the user turn + assistant prompt) are in meta["questions"][i]["ids"]. prefix + question ids
 together reproduce the qa_eval prompt layout.
@@ -30,6 +31,7 @@ def main():
     ap.add_argument("--n_docs", type=int, default=30, help="document sets per length bucket")
     ap.add_argument("--n_gold", type=int, default=3)
     ap.add_argument("--n_q", type=int, default=5)
+    ap.add_argument("--q_per_gold", type=int, default=2)
     ap.add_argument("--name", default="multiq_eval")
     a = ap.parse_args()
     if PromptPool.exists(a.name):
@@ -43,8 +45,8 @@ def main():
     by_ctx = collections.defaultdict(list)
     for ex in B.squad:
         by_ctx[ex["context"]].append(ex)
-    multi = [c for c, v in by_ctx.items() if len(v) >= 2]
-    print(f"[src] {len(by_ctx)} SQuAD contexts, {len(multi)} with >= 2 answerable questions ({(time.time()-t0)/60:.1f} min)", flush=True)
+    multi = [c for c, v in by_ctx.items() if len(v) >= a.q_per_gold]
+    print(f"[src] {len(by_ctx)} SQuAD contexts, {len(multi)} with >= {a.q_per_gold} answerable questions ({(time.time()-t0)/60:.1f} min)", flush=True)
     head, tail = T.chat([{"role": "user", "content": "XXXSPLITXXX"}])[1].split("XXXSPLITXXX")
     rng = B.rng
     out = []
@@ -54,7 +56,7 @@ def main():
                 golds = rng.sample(multi, a.n_gold)
                 qs = []
                 for c in golds:
-                    qs += [(c, ex) for ex in rng.sample(by_ctx[c], 2)]
+                    qs += [(c, ex) for ex in rng.sample(by_ctx[c], a.q_per_gold)]
                 rng.shuffle(qs)
                 qs = qs[:a.n_q]
                 qmax = max(T.n(f"Question: {ex['question']}" + tail) for _, ex in qs)

@@ -86,6 +86,27 @@ for q in qs:
     assert 0.15 <= frac <= 0.4 and torch.isfinite(lg).all(), frac
 print("[ok] ours 20% sentences: 3 questions")
 
+# 3b) pre: document-time recompute. 100% -> exact large-model cache; the question extension then equals big
+st = mq.doc("pre:1.0", doc)
+close(st["kb"][:, :, :T], kb_big, "pre 100%: document cache keys == large model")
+_, _, lg, frac, _ = mq.ask_prefill(st, qs[0])
+_, _, lg_ref = FastBig(L).prefill(torch.cat([doc, qs[0]]))
+close(lg[0], lg_ref[0], "pre 100%: question logits == large model")
+assert frac == 0.0
+# 20% sentences, no per-question part == the single-prompt pipeline on the document alone (same tail scoring)
+st = mq.doc("pre:0.2:sent", doc)
+kb_r, vb_r, _, n_r = rh.prefill_sel(doc, "attn_small", 0.2, seg="sent")
+close(st["kb"][:, :, :T], kb_r, "pre 20% sentences: document cache == prefill_sel(document)")
+assert int(st["done"].sum()) == n_r, (int(st["done"].sum()), n_r)
+# + 20% per question: new units only, they persist
+st = mq.doc("pre:0.2:sent:0.2", doc)
+d0 = int(st["done"].sum())
+for q in qs[:2]:
+    _, _, lg, frac, _ = mq.ask_prefill(st, q)
+    assert 0.1 <= frac <= 0.4 and torch.isfinite(lg).all(), frac
+assert int(st["done"].sum()) > d0 * 2, (d0, int(st["done"].sum()))
+print(f"[ok] pre 20% + 20%/question: done {d0} -> {int(st['done'].sum())}/{m}")
+
 # 4) spec-agn: compact cache + extension == HF with the kept positions, then the question at T..T+Q-1
 st = mq.doc("spec-agn:0.3", doc)
 K = st["pos"].shape[0]

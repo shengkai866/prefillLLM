@@ -4,7 +4,8 @@ import os
 SCRATCH_ROOT = os.environ.get("PREFILL_ROOT", "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM")
 
 MODELS_DIR = os.path.join(SCRATCH_ROOT, "models")
-DATA_DIR = os.path.join(SCRATCH_ROOT, "data")
+# Token pools depend on the tokenizer: another model family (Llama) uses its own tree, e.g. PREFILL_DATA_DIR=$PREFILL_ROOT/data_llama
+DATA_DIR = os.environ.get("PREFILL_DATA_DIR", os.path.join(SCRATCH_ROOT, "data"))
 CKPT_DIR = os.path.join(SCRATCH_ROOT, "checkpoints")
 # Small human-readable outputs (summary.md, results.json) live with the code; big artifacts stay on scratch.
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

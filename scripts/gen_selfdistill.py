@@ -6,6 +6,8 @@ end of turn, at most --max_new tokens) every prompt of a pool. Writes DATA_DIR/<
   prompt_len.npy                     prompt length of every sequence
   meta.jsonl                         pool metadata (+ "pool_idx")
 Work is done in shards (resumable after a crash); prompts are length-sorted and batched under a token budget.
+Several GPUs: run one process per GPU with --worker k --n_workers N (each does shards k, k+N, ...), then once more
+without them to merge (all shards then exist, so it only merges).
 """
 import argparse
 import json
@@ -61,6 +63,8 @@ def main():
     ap.add_argument("--max_batch", type=int, default=64)
     ap.add_argument("--shard", type=int, default=1000)
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--worker", type=int, default=0)
+    ap.add_argument("--n_workers", type=int, default=1)
     a = ap.parse_args()
     out_dir = os.path.join(C.DATA_DIR, a.out)
     if os.path.exists(os.path.join(out_dir, "meta.jsonl")):
@@ -81,6 +85,8 @@ def main():
     t0, done = time.time(), 0
     for si, idxs in enumerate(shards):
         path = os.path.join(shard_dir, f"{si:04d}.json")
+        if si % a.n_workers != a.worker:
+            continue
         if os.path.exists(path):
             done += len(idxs)
             continue
@@ -101,6 +107,10 @@ def main():
         el = time.time() - t0
         print(f"[selfdistill] shard {si + 1}/{len(shards)}: {done}/{len(pool)} prompts, {el/60:.1f} min elapsed", flush=True)
 
+    missing = [si for si in range(len(shards)) if not os.path.exists(os.path.join(shard_dir, f"{si:04d}.json"))]
+    if missing:
+        print(f"[selfdistill] worker {a.worker}/{a.n_workers} done; {len(missing)} shards left to other workers, not merging", flush=True)
+        return
     seqs, plens, metas = [], [], []
     for si in range(len(shards)):
         for rec in json.load(open(os.path.join(shard_dir, f"{si:04d}.json"))):

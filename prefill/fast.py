@@ -1,7 +1,7 @@
 """
 Fast inference path (same math as prefill/kv.py, much less overhead). Works with already-trained projectors.
 
-  FastQwen3          lean Qwen3 forward on plain tensors: fused QKV and gate/up weights (shared storage with the
+  FastQwen3          lean Qwen3 (or Llama 3: same block without q/k norm) forward on plain tensors: fused QKV and gate/up weights (shared storage with the
                      HF model, no extra memory), no Cache objects, KV written straight into a preallocated buffer.
   FoldedProjectorKV  exact algebraic folding of  projector tail (Linear d_mid->d_l, per-layer low-rank, bias)
                      -> input_layernorm -> k_proj / v_proj  into ONE batched matmul over all large layers.
@@ -64,7 +64,8 @@ class FastQwen3:
                 a.v_proj.weight = torch.nn.Parameter(wqkv[nq + nk:], requires_grad=False)
                 mlp.gate_proj.weight = torch.nn.Parameter(wgu[:ng], requires_grad=False)
                 mlp.up_proj.weight = torch.nn.Parameter(wgu[ng:], requires_grad=False)
-                self.layers.append(dict(ln1=L.input_layernorm.weight, wqkv=wqkv, qn=a.q_norm.weight, kn=a.k_norm.weight,
+                qn, kn = (a.q_norm.weight, a.k_norm.weight) if hasattr(a, "q_norm") else (None, None)  # Llama: none
+                self.layers.append(dict(ln1=L.input_layernorm.weight, wqkv=wqkv, qn=qn, kn=kn,
                                         wo=a.o_proj.weight, ln2=L.post_attention_layernorm.weight, wgu=wgu,
                                         wd=mlp.down_proj.weight))
             # RoPE table, computed exactly like Qwen3RotaryEmbedding (fp32, then cast)
@@ -78,8 +79,10 @@ class FastQwen3:
     def _qkv(self, lw, x, cos, sin):
         T = x.shape[0]
         q, k, v = F.linear(x, lw["wqkv"]).split([self.H * self.D, self.Hkv * self.D, self.Hkv * self.D], -1)
-        q = rms(q.view(T, self.H, self.D), lw["qn"], self.eps).transpose(0, 1)
-        k = rms(k.view(T, self.Hkv, self.D), lw["kn"], self.eps).transpose(0, 1)
+        q, k = q.view(T, self.H, self.D), k.view(T, self.Hkv, self.D)
+        if lw["qn"] is not None:
+            q, k = rms(q, lw["qn"], self.eps), rms(k, lw["kn"], self.eps)
+        q, k = q.transpose(0, 1), k.transpose(0, 1)
         v = v.view(T, self.Hkv, self.D).transpose(0, 1)
         return rope(q, cos, sin), rope(k, cos, sin), v
 
@@ -205,7 +208,8 @@ class FoldedProjectorKV:
             if len(lf.layers) * ncol_pad * self.chunk * 2 > 1.25 * 2 ** 30:
                 self.chunk = min(self.chunk, 1024)
             self.bcat = torch.stack(bc)[:, None, :]  # [Ll, 1, ncol_pad]
-            self.kn = torch.stack([lw["kn"] for lw in lf.layers])[:, None, None, :]  # [Ll,1,1,D]
+            self.kn = None if lf.layers[0]["kn"] is None else \
+                torch.stack([lw["kn"] for lw in lf.layers])[:, None, None, :]  # [Ll,1,1,D]; None for Llama
 
     def __call__(self, hs, cos, sin, kdst, vdst, n_layers=None):
         """hs [Ls, n, d_s] small-model hidden states of the middle tokens; cos/sin [n, D]; writes kdst/vdst [Ll,Hkv,n,D].
@@ -221,7 +225,7 @@ class FoldedProjectorKV:
             Y = torch.baddbmm(self.bcat[:Ll], a, self.Wcat[:Ll])  # [Ll, nc, ncol_pad]
             inv = torch.rsqrt(Y[..., 2 * self.KV:].float().pow(2).sum(-1, keepdim=True) / self.d_l + self.eps)
             k = (Y[..., :self.KV].float() * inv).to(self.dt).view(Ll, nc, self.Hkv, self.D)
-            k = rms(k, self.kn[:Ll], self.eps).transpose(1, 2)
+            k = (k if self.kn is None else rms(k, self.kn[:Ll], self.eps)).transpose(1, 2)
             v = (Y[..., self.KV:2 * self.KV].float() * inv).to(self.dt).view(Ll, nc, self.Hkv, self.D).transpose(1, 2)
             kdst[:, :, c0:c1] = rope(k, cos[c0:c1], sin[c0:c1])
             vdst[:, :, c0:c1] = v

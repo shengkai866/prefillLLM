@@ -5,7 +5,14 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import torch
-from transformers import Qwen3Config, Qwen3ForCausalLM
+from transformers import LlamaConfig, LlamaForCausalLM, Qwen3Config, Qwen3ForCausalLM
+
+# SMOKE_ARCH=llama: same tests on tiny Llama 3 models (no q/k norm, llama3 RoPE scaling)
+LLAMA = os.environ.get("SMOKE_ARCH", "qwen3") == "llama"
+if LLAMA:
+    _LR = dict(rope_type="llama3", factor=8.0, low_freq_factor=1.0, high_freq_factor=4.0, original_max_position_embeddings=512)
+    Qwen3Config = lambda **kw: LlamaConfig(rope_scaling=_LR, **kw)  # noqa: E731
+    Qwen3ForCausalLM = LlamaForCausalLM
 
 from prefill.fast import FastBig, FastHybrid, FastQwen3, FoldedProjectorKV
 from prefill.models import new_projector
