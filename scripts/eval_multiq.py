@@ -26,6 +26,7 @@ from eval_recompute import Engine, GenLog, fmt  # noqa: E402
 from evaluate_v2 import mean, qa_scores  # noqa: E402
 from prefill import config as C  # noqa: E402
 from prefill.fast import time_call  # noqa: E402
+from prefill.mcq import choose_letter, letter_token_ids  # noqa: E402
 from prefill.mixdata import PromptPool  # noqa: E402
 from prefill.models import load_pair  # noqa: E402
 from prefill.multiq import MultiQ, parse_cfg, per_question_frac  # noqa: E402
@@ -49,7 +50,9 @@ def label(cfg):
 QBINS = ((1, 1), (2, 5), (6, 10), (11, 20))  # question index ranges (1-based) reported for long question sequences
 
 
-def task_qa(mq, tok, cfgs, dev, log, max_new=32, pool="multiq_eval"):
+def task_qa(mq, tok, cfgs, dev, log, max_new=32, pool="multiq_eval", letter_ids=None):
+    """Questions with "answers" are generated and scored by F1 / EM / contains; multiple-choice questions ("gold",
+    QuALITY) are scored from the first-token logits (prefill/mcq.py) and the accuracy fills all three keys."""
     pool = PromptPool(pool)
     long_seq = max(len(m["questions"]) for m in pool.meta) > 5
     rows = []
@@ -59,17 +62,27 @@ def task_qa(mq, tok, cfgs, dev, log, max_new=32, pool="multiq_eval"):
         for i, m in enumerate(pool.meta):
             st = mq.doc(c, torch.as_tensor(pool.ids(i), device=dev))
             for j, q in enumerate(m["questions"]):
-                out, frac = mq.ask(st, torch.as_tensor(q["ids"], device=dev), max_new)
-                text = tok.decode(out, skip_special_tokens=True)
-                r = qa_scores(text, q["answers"])
+                q_ids = torch.as_tensor(q["ids"], device=dev)
+                if "gold" in q:
+                    _, _, lg, frac, _ = mq.ask_prefill(st, q_ids)
+                    pred = choose_letter(lg, letter_ids)
+                    text = "ABCD"[pred]
+                    r = {k: float(pred == q["gold"]) for k in ("f1", "em", "contains")}
+                else:
+                    out, frac = mq.ask(st, q_ids, max_new)
+                    text = tok.decode(out, skip_special_tokens=True)
+                    r = qa_scores(text, q["answers"])
                 for key in ("f1", "em", "contains"):
                     acc[(m["bucket"], "all")][key].append(r[key])
                     acc[(m["bucket"], "q1" if j == 0 else "later")][key].append(r[key])
+                    if q.get("difficult"):
+                        acc[(m["bucket"], "hard")][key].append(r[key])
                     if long_seq:
                         lo, hi = next(bn for bn in QBINS if bn[0] <= j + 1 <= bn[1])
                         acc[(m["bucket"], f"q{lo}-{hi}")][key].append(r[key])
                 acc[(m["bucket"], "all")]["frac"].append(frac)
-                log(task="qa", config=c, bucket=m["bucket"], doc=i, q=j, question=q["question"], answers=q["answers"], output=text, frac=frac, **r)
+                log(task="qa", config=c, bucket=m["bucket"], doc=i, q=j, question=q["question"], answers=q.get("answers", q.get("gold")),
+                    output=text, frac=frac, **r)
             del st
         for (b, part), v in sorted(acc.items()):
             rows.append({"config": c, "bucket": b, "part": part, "n": len(v["f1"]), **{k: mean(v[k]) for k in ("f1", "em", "contains")},
@@ -141,6 +154,12 @@ def write_summary(res, path):
             L.append(f"| {label(c)} | {fmt(fr, '{:.1%}')} | " + " | ".join(fmt(get(c, b, p, "f1")) for b in ("4k", "8k") for p in ("all", "q1", "later"))
                      + f" | {fmt(get(c, '4k', 'all', 'contains'))} | {fmt(get(c, '8k', 'all', 'contains'))} |")
         L += ["", "“大模型计算比例”：我们 = 每个问题重算的中间 token 比例；SpecPrefill = 保留的文档 token 比例（8k）。"]
+        if any(r["part"] == "hard" for r in res["qa"]):
+            L += ["", "池是 QuALITY（4 选 1，按首 token 的字母 logits 判分，上表的 F1 / 包含答案都是准确率）。hard 题（需要通读全文）：", "",
+                  "| 配置 | 4k 全部 | 4k hard | 8k 全部 | 8k hard |", "|---|---|---|---|---|"]
+            for c in cfgs:
+                if get(c, "4k", "all", "f1") is not None or get(c, "8k", "all", "f1") is not None:
+                    L.append(f"| {label(c)} | " + " | ".join(fmt(get(c, b, p, "f1")) for b in ("4k", "8k") for p in ("all", "hard")) + " |")
         bins = [f"q{lo}-{hi}" for lo, hi in QBINS if any(r["part"] == f"q{lo}-{hi}" for r in res["qa"])]
         if bins:
             L += ["", "### 按问题序号的 F1（第几个问题；缓存累积的配置越往后缓存越完整）", "",
@@ -214,7 +233,7 @@ def main():
             continue
         t0 = time.time()
         if task == "qa":
-            res["qa"] = keep + task_qa(mq, tok, todo, dev, log, pool=a.pool)
+            res["qa"] = keep + task_qa(mq, tok, todo, dev, log, pool=a.pool, letter_ids=letter_token_ids(tok))
             res["qa"].sort(key=lambda r: cfgs.index(r["config"]) if r["config"] in cfgs else 99)
         elif task == "speed":
             res["speed"] = task_speed(mq, [c for c in a.speed_configs.split(",") if c], dev, [int(x) for x in a.speed_lengths.split(",")], a.speed_reps,

@@ -1,0 +1,485 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "big",
+   "hyb",
+   "attn_small:0.1:sent",
+   "drop-attn_small:0.2:sent",
+   "specprefill:0.1",
+   "specprefill:0.3"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/ll1toq8_mix8k/projector.pt",
+   "configs": "big,hyb,attn_small:0.1:sent,drop-attn_small:0.2:sent,specprefill:0.1,specprefill:0.3",
+   "speed_configs": "big,hyb,attn_big:0.05,attn_big:0.1,attn_big:0.2,attn_small:0.05,attn_small:0.1,attn_small:0.2,random:0.1",
+   "tasks": "niah_long,qa_long",
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_qa": 50,
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "speed_lengths": "4096,8192,16384,32768",
+   "speed_reps": 5,
+   "speed_graph": false,
+   "n_qa_long": 40,
+   "long_max": 0,
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/ll1toq8_long",
+   "rarecache_fit": "",
+   "force": false,
+   "plot_only": false
+  },
+  "proj_step": 12000,
+  "time": "2026-11-03 13:39:26"
+ },
+ "niah_long": [
+  {
+   "config": "big",
+   "length": 15872,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "length": 32256,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 1.0
+  },
+  {
+   "config": "hyb",
+   "length": 15872,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "length": 32256,
+   "n": 30,
+   "accuracy": 0.9666666666666667,
+   "frac": 0.0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "length": 15872,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.10111660970072692
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "length": 32256,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.10056285463169103
+  },
+  {
+   "config": "drop-attn_small:0.2:sent",
+   "length": 15872,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.20100288041102016
+  },
+  {
+   "config": "drop-attn_small:0.2:sent",
+   "length": 32256,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.20050158172328192
+  },
+  {
+   "config": "specprefill:0.1",
+   "length": 15872,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.10100631714369955
+  },
+  {
+   "config": "specprefill:0.1",
+   "length": 32256,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.1002895382633455
+  },
+  {
+   "config": "specprefill:0.3",
+   "length": 15872,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.3010071589476855
+  },
+  {
+   "config": "specprefill:0.3",
+   "length": 32256,
+   "n": 30,
+   "accuracy": 1.0,
+   "frac": 0.3008872350302375
+  }
+ ],
+ "qa_long": [
+  {
+   "config": "big",
+   "source": "hotpot",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 1.0,
+   "f1": 0.6210964912280702,
+   "em": 0.5,
+   "contains": 0.55
+  },
+  {
+   "config": "big",
+   "source": "hotpot",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 1.0,
+   "f1": 0.4680035650623886,
+   "em": 0.35,
+   "contains": 0.475
+  },
+  {
+   "config": "big",
+   "source": "squad",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 1.0,
+   "f1": 0.699736685443582,
+   "em": 0.5,
+   "contains": 0.8
+  },
+  {
+   "config": "big",
+   "source": "squad",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 1.0,
+   "f1": 0.5546117940272557,
+   "em": 0.325,
+   "contains": 0.7
+  },
+  {
+   "config": "big",
+   "source": "trivia",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 1.0,
+   "f1": 0.8260369674185464,
+   "em": 0.75,
+   "contains": 0.95
+  },
+  {
+   "config": "big",
+   "source": "trivia",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 1.0,
+   "f1": 0.7585569985569985,
+   "em": 0.675,
+   "contains": 0.875
+  },
+  {
+   "config": "hyb",
+   "source": "hotpot",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.0,
+   "f1": 0.5911111111111111,
+   "em": 0.425,
+   "contains": 0.525
+  },
+  {
+   "config": "hyb",
+   "source": "hotpot",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.0,
+   "f1": 0.35833333333333334,
+   "em": 0.3,
+   "contains": 0.3
+  },
+  {
+   "config": "hyb",
+   "source": "squad",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.0,
+   "f1": 0.660692121004621,
+   "em": 0.5,
+   "contains": 0.675
+  },
+  {
+   "config": "hyb",
+   "source": "squad",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.0,
+   "f1": 0.4081249177359017,
+   "em": 0.25,
+   "contains": 0.4
+  },
+  {
+   "config": "hyb",
+   "source": "trivia",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.0,
+   "f1": 0.79875,
+   "em": 0.75,
+   "contains": 0.85
+  },
+  {
+   "config": "hyb",
+   "source": "trivia",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.0,
+   "f1": 0.6656385281385281,
+   "em": 0.575,
+   "contains": 0.775
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "source": "hotpot",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10123111516261979,
+   "f1": 0.6308333333333334,
+   "em": 0.525,
+   "contains": 0.55
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "source": "hotpot",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.10065933093680329,
+   "f1": 0.5536309523809524,
+   "em": 0.475,
+   "contains": 0.525
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "source": "squad",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10113348282804095,
+   "f1": 0.6605849769998376,
+   "em": 0.475,
+   "contains": 0.8
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "source": "squad",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.10062567679174193,
+   "f1": 0.5846594934869488,
+   "em": 0.4,
+   "contains": 0.75
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "source": "trivia",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10093068501630914,
+   "f1": 0.8207738095238095,
+   "em": 0.75,
+   "contains": 0.95
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "source": "trivia",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.10057577035834446,
+   "f1": 0.7507575757575757,
+   "em": 0.7,
+   "contains": 0.8
+  },
+  {
+   "config": "drop-attn_small:0.2:sent",
+   "source": "hotpot",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.20140524138661026,
+   "f1": 0.5727631578947369,
+   "em": 0.425,
+   "contains": 0.525
+  },
+  {
+   "config": "drop-attn_small:0.2:sent",
+   "source": "hotpot",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.20066381126895855,
+   "f1": 0.5037864671560324,
+   "em": 0.4,
+   "contains": 0.5
+  },
+  {
+   "config": "drop-attn_small:0.2:sent",
+   "source": "squad",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.2011039115171382,
+   "f1": 0.6537574238461336,
+   "em": 0.475,
+   "contains": 0.8
+  },
+  {
+   "config": "drop-attn_small:0.2:sent",
+   "source": "squad",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.20076239157326914,
+   "f1": 0.5139623122968144,
+   "em": 0.275,
+   "contains": 0.675
+  },
+  {
+   "config": "drop-attn_small:0.2:sent",
+   "source": "trivia",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.20085562597800502,
+   "f1": 0.7793055555555556,
+   "em": 0.7,
+   "contains": 0.875
+  },
+  {
+   "config": "drop-attn_small:0.2:sent",
+   "source": "trivia",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.20062694931425737,
+   "f1": 0.7217893217893218,
+   "em": 0.625,
+   "contains": 0.825
+  },
+  {
+   "config": "specprefill:0.1",
+   "source": "hotpot",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10095007941785814,
+   "f1": 0.4655357142857143,
+   "em": 0.3,
+   "contains": 0.425
+  },
+  {
+   "config": "specprefill:0.1",
+   "source": "hotpot",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.10036931834622424,
+   "f1": 0.48074675324675326,
+   "em": 0.4,
+   "contains": 0.525
+  },
+  {
+   "config": "specprefill:0.1",
+   "source": "squad",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10076423781073764,
+   "f1": 0.5182283844120612,
+   "em": 0.325,
+   "contains": 0.65
+  },
+  {
+   "config": "specprefill:0.1",
+   "source": "squad",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.10027594206640783,
+   "f1": 0.46762939341594156,
+   "em": 0.225,
+   "contains": 0.6
+  },
+  {
+   "config": "specprefill:0.1",
+   "source": "trivia",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10048656973043657,
+   "f1": 0.69960780155517,
+   "em": 0.625,
+   "contains": 0.8
+  },
+  {
+   "config": "specprefill:0.1",
+   "source": "trivia",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.10014330218481023,
+   "f1": 0.6776046176046177,
+   "em": 0.55,
+   "contains": 0.85
+  },
+  {
+   "config": "specprefill:0.3",
+   "source": "hotpot",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.3006597832025418,
+   "f1": 0.5745833333333333,
+   "em": 0.375,
+   "contains": 0.5
+  },
+  {
+   "config": "specprefill:0.3",
+   "source": "hotpot",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.3000099960347127,
+   "f1": 0.46635532961190856,
+   "em": 0.35,
+   "contains": 0.55
+  },
+  {
+   "config": "specprefill:0.3",
+   "source": "squad",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.3002665433680873,
+   "f1": 0.5873053563771911,
+   "em": 0.375,
+   "contains": 0.75
+  },
+  {
+   "config": "specprefill:0.3",
+   "source": "squad",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.2998848784492154,
+   "f1": 0.48516534316937543,
+   "em": 0.225,
+   "contains": 0.675
+  },
+  {
+   "config": "specprefill:0.3",
+   "source": "trivia",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.3003099449392162,
+   "f1": 0.7910780423280424,
+   "em": 0.7,
+   "contains": 0.9
+  },
+  {
+   "config": "specprefill:0.3",
+   "source": "trivia",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.30006982248052605,
+   "f1": 0.7752236652236653,
+   "em": 0.675,
+   "contains": 0.9
+  }
+ ]
+}

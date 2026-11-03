@@ -33,3 +33,6 @@ results/**/generations.jsonl
 .claude/
 .DS_Store
 .env
+
+# tmux client logs
+tmux-client-*.log

@@ -4,4 +4,4 @@ export PREFILL_SMALL_DIR=$PREFILL_ROOT/models/Llama-3.2-1B-Instruct
 export PREFILL_LARGE_DIR=$PREFILL_ROOT/models/Llama-3.1-8B-Instruct
 export PREFILL_DATA_DIR=$PREFILL_ROOT/data_llama
 mkdir -p $PREFILL_DATA_DIR
-for d in gsm8k longbench; do [ -e $PREFILL_DATA_DIR/$d ] || ln -s $PREFILL_ROOT/data/$d $PREFILL_DATA_DIR/$d; done
+for d in gsm8k longbench quality; do [ -e $PREFILL_DATA_DIR/$d ] || ln -s $PREFILL_ROOT/data/$d $PREFILL_DATA_DIR/$d; done

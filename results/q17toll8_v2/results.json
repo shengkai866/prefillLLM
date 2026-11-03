@@ -1,0 +1,164 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "q17toll8"
+  ],
+  "args": {
+   "projectors": "q17toll8=/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/q17toll8_mix8k/projector.pt",
+   "curve_runs": "q17toll8=/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/q17toll8_mix8k",
+   "tasks": "kl,curve",
+   "n_kl": 40,
+   "n_qa": 100,
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "n_curve_kl": 6,
+   "n_curve_ret": 12,
+   "baselines": "",
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/q17toll8_v2",
+   "force": false,
+   "device": "cuda"
+  },
+  "time": "2026-11-03 07:28:41"
+ },
+ "kl": [
+  {
+   "config": "q17toll8",
+   "type": "chat",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.061802491918206214,
+   "top1_agree": 0.9409966737031936
+  },
+  {
+   "config": "q17toll8",
+   "type": "chat",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.06022421367233619,
+   "top1_agree": 0.9404560506343842
+  },
+  {
+   "config": "q17toll8",
+   "type": "code",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.09967036349698902,
+   "top1_agree": 0.93603515625
+  },
+  {
+   "config": "q17toll8",
+   "type": "code",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.12937007311847992,
+   "top1_agree": 0.93115234375
+  },
+  {
+   "config": "q17toll8",
+   "type": "math",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.018598461872898042,
+   "top1_agree": 0.9717859596014022
+  },
+  {
+   "config": "q17toll8",
+   "type": "math",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.029922404896933586,
+   "top1_agree": 0.9698463007807732
+  },
+  {
+   "config": "q17toll8",
+   "type": "qa",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.2526326118735597,
+   "top1_agree": 0.9187945693731308
+  },
+  {
+   "config": "q17toll8",
+   "type": "qa",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.466296815359965,
+   "top1_agree": 0.8284470245242119
+  },
+  {
+   "config": "q17toll8",
+   "type": "retrieval",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 1.3635070959338917,
+   "top1_agree": 0.7359722621738911
+  },
+  {
+   "config": "q17toll8",
+   "type": "retrieval",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 1.0878451550612227,
+   "top1_agree": 0.7770837172865868
+  },
+  {
+   "config": "q17toll8",
+   "type": "web",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.1431585075799376,
+   "top1_agree": 0.87607421875
+  },
+  {
+   "config": "q17toll8",
+   "type": "web",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.14001021832227706,
+   "top1_agree": 0.89697265625
+  }
+ ],
+ "curve": [
+  {
+   "run": "q17toll8",
+   "step": 2000,
+   "kl_4k": 0.5062597066474458,
+   "retrieval_acc": 0.0
+  },
+  {
+   "run": "q17toll8",
+   "step": 4000,
+   "kl_4k": 0.40985244517732,
+   "retrieval_acc": 0.0
+  },
+  {
+   "run": "q17toll8",
+   "step": 6000,
+   "kl_4k": 0.38303948827605283,
+   "retrieval_acc": 0.0
+  },
+  {
+   "run": "q17toll8",
+   "step": 8000,
+   "kl_4k": 0.3461591204783569,
+   "retrieval_acc": 0.0
+  },
+  {
+   "run": "q17toll8",
+   "step": 10000,
+   "kl_4k": 0.3464470870870476,
+   "retrieval_acc": 0.0
+  },
+  {
+   "run": "q17toll8",
+   "step": 12000,
+   "kl_4k": 0.3715558746545058,
+   "retrieval_acc": 0.0
+  }
+ ]
+}

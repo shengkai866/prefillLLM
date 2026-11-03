@@ -1,0 +1,164 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "ll1toq8"
+  ],
+  "args": {
+   "projectors": "ll1toq8=/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/ll1toq8_mix8k/projector.pt",
+   "curve_runs": "ll1toq8=/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/ll1toq8_mix8k",
+   "tasks": "kl,curve",
+   "n_kl": 40,
+   "n_qa": 100,
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "n_curve_kl": 6,
+   "n_curve_ret": 12,
+   "baselines": "",
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/ll1toq8_v2",
+   "force": false,
+   "device": "cuda"
+  },
+  "time": "2026-11-03 08:38:17"
+ },
+ "kl": [
+  {
+   "config": "ll1toq8",
+   "type": "chat",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.10694465243723243,
+   "top1_agree": 0.9101076036691665
+  },
+  {
+   "config": "ll1toq8",
+   "type": "chat",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.08713601715862751,
+   "top1_agree": 0.9177946761250496
+  },
+  {
+   "config": "ll1toq8",
+   "type": "code",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.13201078153215348,
+   "top1_agree": 0.9291015625
+  },
+  {
+   "config": "ll1toq8",
+   "type": "code",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.14911616533063352,
+   "top1_agree": 0.924609375
+  },
+  {
+   "config": "ll1toq8",
+   "type": "math",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.019917188677936792,
+   "top1_agree": 0.9788271382451057
+  },
+  {
+   "config": "ll1toq8",
+   "type": "math",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.010824099712772295,
+   "top1_agree": 0.9825524061918258
+  },
+  {
+   "config": "ll1toq8",
+   "type": "qa",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.29897394589679605,
+   "top1_agree": 0.9064620047807693
+  },
+  {
+   "config": "ll1toq8",
+   "type": "qa",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.2591284342444851,
+   "top1_agree": 0.9214050963521003
+  },
+  {
+   "config": "ll1toq8",
+   "type": "retrieval",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.10053632111264221,
+   "top1_agree": 0.977759200334549
+  },
+  {
+   "config": "ll1toq8",
+   "type": "retrieval",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.09613050375203898,
+   "top1_agree": 0.9792956277728081
+  },
+  {
+   "config": "ll1toq8",
+   "type": "web",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.08666056818328798,
+   "top1_agree": 0.91630859375
+  },
+  {
+   "config": "ll1toq8",
+   "type": "web",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.12279215860180556,
+   "top1_agree": 0.89697265625
+  }
+ ],
+ "curve": [
+  {
+   "run": "ll1toq8",
+   "step": 2000,
+   "kl_4k": 0.4496043061242542,
+   "retrieval_acc": 0.37916666666666665
+  },
+  {
+   "run": "ll1toq8",
+   "step": 4000,
+   "kl_4k": 0.21633883581186333,
+   "retrieval_acc": 0.525
+  },
+  {
+   "run": "ll1toq8",
+   "step": 6000,
+   "kl_4k": 0.21482615487831128,
+   "retrieval_acc": 0.6208333333333333
+  },
+  {
+   "run": "ll1toq8",
+   "step": 8000,
+   "kl_4k": 0.1719197028497648,
+   "retrieval_acc": 0.6875
+  },
+  {
+   "run": "ll1toq8",
+   "step": 10000,
+   "kl_4k": 0.15714124817330027,
+   "retrieval_acc": 0.6916666666666667
+  },
+  {
+   "run": "ll1toq8",
+   "step": 12000,
+   "kl_4k": 0.14703429832136156,
+   "retrieval_acc": 0.7458333333333333
+  }
+ ]
+}

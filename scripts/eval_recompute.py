@@ -268,6 +268,43 @@ def task_niah(E, cfgs, log, pool="niah_eval", name="niah", max_bucket=0):
     return rows
 
 
+def task_quality(E, cfgs, n, log, pool="quality_eval"):
+    """QuALITY: 4-way multiple choice scored from the first-token logits (prefill/mcq.py). The whole question block
+    (question + options + end of turn) is kept in the large model's tail (rh.n_tail raised per prompt), so no option is
+    ever projected or dropped by our configs; SpecPrefill is unchanged (official selection over the whole prompt)."""
+    from prefill.mcq import choose_letter, letter_token_ids
+    pool = PromptPool(pool)
+    lid = letter_token_ids(E.tok)
+    idx = list(range(len(pool.meta)))[:n] if n else list(range(len(pool.meta)))
+    n_tail0 = E.rh.n_tail
+    rows = []
+    for c in cfgs:
+        t0 = time.time()
+        acc, fr = collections.defaultdict(list), collections.defaultdict(list)
+        for i in idx:
+            m = pool.meta[i]
+            ids = torch.as_tensor(pool.ids(i), device=E.dev)
+            E.rh.n_tail = max(n_tail0, m["q_len"])
+            try:
+                _, _, lg, frac = E.prefill(c, ids)
+            finally:
+                E.rh.n_tail = n_tail0
+            pred = choose_letter(lg, lid)
+            ok = float(pred == m["gold"])
+            keys = [(m["bucket"], "all"), ("all", "all")] + ([(m["bucket"], "hard"), ("all", "hard")] if m["difficult"] else [])
+            for k in keys:
+                acc[k].append(ok)
+                fr[k].append(frac)
+            log(task="quality", config=c, bucket=m["bucket"], idx=i, question_id=m["question_id"], gold=m["gold"], pred=pred,
+                difficult=m["difficult"], score=ok, frac=frac)
+        for (b, part), v in sorted(acc.items()):
+            rows.append({"config": c, "bucket": b, "part": part, "n": len(v), "accuracy": mean(v), "frac": mean(fr[(b, part)])})
+        print(f"[quality] {c:>18}: " + " ".join(f"{b}/{p}={mean(v):.3f}" for (b, p), v in sorted(acc.items()))
+              + f"  ({(time.time()-t0)/60:.1f} min)", flush=True)
+        torch.cuda.empty_cache()
+    return rows
+
+
 def task_speed(E, cfgs, lengths, reps):
     rows = []
     g = torch.Generator().manual_seed(0)
@@ -415,6 +452,20 @@ def write_summary(res, path):
         fr = "全部" if c == "big" else fmt(ruler_frac(res, c, 8192), '{:.1%}')
         L.append(f"| {label(c)} | {fr} | {fmt(ruler_mean(res, c, 4096))} | {fmt(ruler_mean(res, c, 8192))} | "
                  f"{fmt(qa_mean(res, c, '4k'))} | {fmt(qa_mean(res, c, '8k'))} | {fmt(niah_mean(res, c))} |")
+    if "quality" in res:
+        get = lambda c, b, p: next((r for r in res["quality"] if r["config"] == c and r["bucket"] == b and r["part"] == p), None)
+        cnt = lambda b, p: next((r["n"] for r in res["quality"] if r["bucket"] == b and r["part"] == p), 0)
+        L += ["", "## QuALITY（4 选 1，按首 token 的字母 logits 判分；问题和选项始终在大模型计算的尾部里）", "",
+              f"题数：全部 {cnt('all', 'all')}（hard {cnt('all', 'hard')}），文章 < 4k token 的 {cnt('4k', 'all')}，其余 {cnt('8k', 'all')}；"
+              f"准确率的标准误约 ±{(0.25 / max(cnt('all', 'all'), 1)) ** 0.5:.3f}。", "",
+              "| 配置 | 重算比例 | 全部 | hard | 4k 全部 | 4k hard | 8k 全部 | 8k hard |", "|---|---|---|---|---|---|---|---|"]
+        for c in cfgs:
+            r = get(c, "all", "all")
+            if r is None:
+                continue
+            cell = lambda b, p: fmt(get(c, b, p)["accuracy"]) if get(c, b, p) else "-"
+            L.append(f"| {label(c)} | {fmt(r['frac'], '{:.1%}')} | {cell('all', 'all')} | {cell('all', 'hard')} | {cell('4k', 'all')} | "
+                     f"{cell('4k', 'hard')} | {cell('8k', 'all')} | {cell('8k', 'hard')} |")
     for Ln in (4096, 8192):
         if not any(r["length"] == Ln for r in res.get("ruler", [])):
             continue
@@ -595,6 +646,7 @@ def main():
     ap.add_argument("--speed_reps", type=int, default=5)
     ap.add_argument("--speed_graph", action="store_true", help="CUDA-graph SpecPrefill's look-ahead steps in the speed task")
     ap.add_argument("--n_qa_long", type=int, default=40)
+    ap.add_argument("--n_quality", type=int, default=0, help="quality: number of questions (0 = all)")
     ap.add_argument("--long_max", type=int, default=0, help="qa_long / niah_long: skip buckets above this many tokens "
                     "(e.g. 16384 for a 32B target that does not fit 32k on one GPU); 0 = all")
     ap.add_argument("--n_sink", type=int, default=8)
@@ -648,6 +700,8 @@ def main():
             res["qa_long"] = task_qa(E, cfgs, a.n_qa_long, log, pool="qa_eval_long", name="qa_long", max_bucket=a.long_max)
         elif task == "niah_long":
             res["niah_long"] = task_niah(E, cfgs, log, pool="niah_eval_long", name="niah_long", max_bucket=a.long_max)
+        elif task == "quality":
+            res["quality"] = task_quality(E, cfgs, a.n_quality, log)
         print(f"[task {task}] {(time.time()-t0)/60:.1f} min", flush=True)
         json.dump(res, open(res_path, "w"), indent=1)
         try:  # a plotting problem must never stop the evaluation

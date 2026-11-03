@@ -1,0 +1,166 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "big",
+   "hyb",
+   "attn_small:0.1:sent",
+   "specprefill:0.1"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r2_mix8k/projector.pt",
+   "configs": "big,hyb,attn_small:0.1:sent,specprefill:0.1",
+   "speed_configs": "big,hyb,attn_big:0.05,attn_big:0.1,attn_big:0.2,attn_small:0.05,attn_small:0.1,attn_small:0.2,random:0.1",
+   "tasks": "quality",
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_qa": 50,
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "speed_lengths": "4096,8192,16384,32768",
+   "speed_reps": 5,
+   "speed_graph": false,
+   "n_qa_long": 40,
+   "n_quality": 4,
+   "long_max": 0,
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/quality_smoke_06",
+   "rarecache_fit": "",
+   "force": true,
+   "plot_only": false
+  },
+  "proj_step": 12000,
+  "time": "2026-11-03 16:58:50"
+ },
+ "quality": [
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.75,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.6666666666666666,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "bucket": "all",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.75,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "bucket": "all",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.6666666666666666,
+   "frac": 1.0
+  },
+  {
+   "config": "hyb",
+   "bucket": "8k",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.5,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.3333333333333333,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "bucket": "all",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.5,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "bucket": "all",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.3333333333333333,
+   "frac": 0.0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "bucket": "8k",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.75,
+   "frac": 0.10066656480854991
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.6666666666666666,
+   "frac": 0.10044688198253097
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "bucket": "all",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.75,
+   "frac": 0.10066656480854991
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "bucket": "all",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.6666666666666666,
+   "frac": 0.10044688198253097
+  },
+  {
+   "config": "specprefill:0.1",
+   "bucket": "8k",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.25,
+   "frac": 0.09815184073251859
+  },
+  {
+   "config": "specprefill:0.1",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.3333333333333333,
+   "frac": 0.09816377056222272
+  },
+  {
+   "config": "specprefill:0.1",
+   "bucket": "all",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.25,
+   "frac": 0.09815184073251859
+  },
+  {
+   "config": "specprefill:0.1",
+   "bucket": "all",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.3333333333333333,
+   "frac": 0.09816377056222272
+  }
+ ]
+}
