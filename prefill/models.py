@@ -1,9 +1,12 @@
 """Model loading helpers (frozen, bf16, SDPA attention)."""
+import os
+
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from .config import LARGE_DIR, LARGE_MAXMEM, SMALL_DIR
+from .config import HF_CACHE_DIR, LARGE_DIR, LARGE_MAXMEM, SMALL_DIR
 from .projector import Projector
+from .tokalign import load_or_build, same_tokenizer
 
 
 def load_frozen(path, device, dtype=torch.bfloat16):
@@ -22,9 +25,19 @@ def load_split(path, maxmem, dtype=torch.bfloat16):
 
 
 def load_pair(device, small_dir=SMALL_DIR, large_dir=LARGE_DIR, large_maxmem=LARGE_MAXMEM):
+    """(large tokenizer, small model, large model). A small model with another tokenizer (Qwen <-> Llama) gets the
+    C2C lookup table large id -> small id attached (prefill/tokalign.py; used by FastQwen3 and small_hidden_states)."""
     tok = AutoTokenizer.from_pretrained(large_dir)
     small = load_frozen(small_dir, device)
     large = load_split(large_dir, large_maxmem) if large_maxmem else load_frozen(large_dir, device)
+    tok_small = AutoTokenizer.from_pretrained(small_dir)
+    if not same_tokenizer(tok, tok_small):
+        name = f"{os.path.basename(large_dir.rstrip('/'))}_to_{os.path.basename(small_dir.rstrip('/'))}"
+        table = load_or_build(tok, tok_small, HF_CACHE_DIR, n_rows=large.config.vocab_size, name=name)
+        small.prefill_id_map = table.to(device)
+        small.prefill_small_eos = eos_ids(tok_small)
+        small.prefill_bos = tok_small.bos_token_id if tok_small.bos_token_id is not None and tok.bos_token_id is None else None
+        print(f"[models] cross-tokenizer pair: {name} lookup table ({len(table)} rows), small BOS {small.prefill_bos}", flush=True)
     return tok, small, large
 
 

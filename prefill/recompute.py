@@ -61,7 +61,7 @@ def small_prefill_scored(S, ids, n_q, lo, hi):
     averaged over layers. Returns (hidden states [L+1, T, d], score [hi-lo] fp32)."""
     T = ids.shape[0]
     cos, sin = S.cos[:T], S.sin[:T]
-    h = F.embedding(ids, S.embed)
+    h = F.embedding(S.ids_in(ids, first=True), S.embed)
     hs = [h]
     score = torch.zeros(hi - lo, dtype=torch.float32, device=ids.device)
     qpos = torch.arange(T - n_q, T, device=ids.device)
@@ -122,6 +122,7 @@ def spec_importance(S, ids, n_lah=8, eos=(), kernel=13, collect=False, graph=Non
     over the queries. Returns (hidden states [L+1, T, d] if collect else None, importance [T] fp32).
     graph: a LookaheadGraph for (T, n_lah) to replay the look-ahead steps instead of running them eagerly."""
     T = ids.shape[0]
+    eos = S.own_eos(eos)  # the look-ahead tokens are the small model's own
     if graph is not None:
         kb, vb = graph.kb, graph.vb
     else:
@@ -208,7 +209,7 @@ def extend_at(L, ids, pos, kbuf, vbuf, n_q=0, lo=0, hi=0, rows=None):
     rows = pos if rows is None else rows
     cos, sin = L.cos[pos], L.sin[pos]
     mask = causal_mask_for(rows, T, L.embed.dtype, ids.device, L.rep)[None, None]
-    h = F.embedding(ids, L.embed)
+    h = F.embedding(L.ids_in(ids), L.embed)
     score = torch.zeros(hi - lo, dtype=torch.float32, device=ids.device) if n_q else None
     for i, lw in enumerate(L.layers):
         q, k, v = L._qkv(lw, rms(h, lw["ln1"], L.eps), cos, sin)

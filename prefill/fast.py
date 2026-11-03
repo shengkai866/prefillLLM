@@ -49,6 +49,13 @@ class FastQwen3:
         self.embed = m.embed_tokens.weight
         self.norm = m.norm.weight
         self.lm_head = hf.lm_head.weight
+        # cross-tokenizer pair (prefill/tokalign.py, set by models.load_pair on the small model): ids given to this
+        # model are large-model ids and go through the lookup table; BOS at position 0 if this model expects one
+        self.id_map = getattr(hf, "prefill_id_map", None)
+        self.bos = getattr(hf, "prefill_bos", None)
+        if self.bos is not None:  # device tensor: writing a Python int into a CUDA tensor is not allowed under graph capture
+            self.bos = torch.tensor([self.bos], dtype=torch.long, device=self.embed.device)
+        self.own_eos_ids = getattr(hf, "prefill_small_eos", None)
         self.layers = []
         with torch.no_grad():
             for L in m.layers:
@@ -76,6 +83,19 @@ class FastQwen3:
             self.cos = (emb.cos() * re.attention_scaling).to(self.embed.dtype)
             self.sin = (emb.sin() * re.attention_scaling).to(self.embed.dtype)
 
+    def ids_in(self, ids, first=False):
+        """ids [T] of this model's vocabulary for the given (large-model) ids; identity for same-tokenizer pairs.
+        first=True: the sequence starts at position 0, which gets this model's BOS if it expects one."""
+        if self.id_map is not None:
+            ids = self.id_map[ids]
+            if first and self.bos is not None:
+                ids = torch.cat([self.bos, ids[1:]])  # device-only op (CUDA-graph safe)
+        return ids
+
+    def own_eos(self, eos):
+        """EOS ids of this model's own vocabulary (for tokens it generates itself, e.g. SpecPrefill's look-ahead)."""
+        return eos if self.own_eos_ids is None else self.own_eos_ids
+
     def _qkv(self, lw, x, cos, sin):
         T = x.shape[0]
         q, k, v = F.linear(x, lw["wqkv"]).split([self.H * self.D, self.Hkv * self.D, self.Hkv * self.D], -1)
@@ -101,7 +121,7 @@ class FastQwen3:
         Returns (last-token logits [1,V] or None, stacked hidden states [L+1,T,d] like HF output_hidden_states or None)."""
         T = ids.shape[0]
         cos, sin = (self.cos[:T], self.sin[:T]) if pos is None else (self.cos[pos], self.sin[pos])
-        h = F.embedding(ids, self.embed)
+        h = F.embedding(self.ids_in(ids, first=pos is None), self.embed)
         hs = [h] if collect else None
         for i, lw in enumerate(self.layers):
             q, k, v = self._qkv(lw, rms(h, lw["ln1"], self.eps), cos, sin)
@@ -132,7 +152,7 @@ class FastQwen3:
         """
         Q = ids.shape[0]
         amask = mask[None, None]
-        h = F.embedding(ids, self.embed)
+        h = F.embedding(self.ids_in(ids), self.embed)
         for i, lw in enumerate(self.layers):
             q, k, v = self._qkv(lw, rms(h, lw["ln1"], self.eps), cos, sin)
             for a, b, n in segs:

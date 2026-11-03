@@ -88,12 +88,21 @@ def truncate_middle(E, text, max_len):
     return E.tok.decode(ids[:h], skip_special_tokens=False) + E.tok.decode(ids[-h:], skip_special_tokens=False)
 
 
-def task_longbench(E, name, cfgs, n, max_len, min_words, max_gen, log):
+def code_line(out, chat):
+    """Predicted next line: the first line of the output; in chat mode the first non-empty line outside a ``` fence."""
+    if not chat:
+        return out.lstrip("\n").split("\n")[0]
+    return next((l for l in out.split("\n") if l.strip() and not l.strip().startswith("```")), "")
+
+
+def task_longbench(E, name, cfgs, n, max_len, min_words, max_gen, log, code_chat=False, code_prefix=""):
     rows_in = [x for x in load_task(name) if x["length"] >= min_words][:n]
     items = []
     for x in rows_in:
         text = truncate_middle(E, PROMPT[name].format(context=x["context"], input=x["input"]), max_len)
-        ids = E.chat_ids([{"role": "user", "content": text}]) if name in CHAT else E.T.raw(text)
+        chat = name in CHAT or code_chat
+        prefix = code_prefix if name not in CHAT else ""
+        ids = E.chat_ids([{"role": "user", "content": text}], prefix) if chat else E.T.raw(text)
         items.append((x["_id"], ids, x["answers"]))
     rows = []
     for c in cfgs:
@@ -104,7 +113,7 @@ def task_longbench(E, name, cfgs, n, max_len, min_words, max_gen, log):
             if name in CHAT:
                 s = max(rouge_l(out, a) for a in answers)
             else:
-                line = out.lstrip("\n").split("\n")[0]
+                line = code_line(out, code_chat)
                 s = max(edit_sim(line, a) for a in answers) / 100
             sc.append(s)
             fr.append(frac)
@@ -119,7 +128,8 @@ def write_summary(res, path):
     a = res["meta"]["args"]
     L = ["# 需要全文信息的任务：LongBench 摘要与代码补全、多示例 GSM8K", "",
          f"GPU：{res['meta']['gpu']}；生成：{res['meta']['time']}；小模型 {C.SMALL_NAME}，大模型 {C.LARGE_NAME}，projector 第 {res['meta'].get('proj_step')} 步。",
-         f"LongBench prompt 超过 {a['max_len']} token 时按官方规则从中间截断；摘要任务走对话模板，代码任务是原始文本；"
+         f"LongBench prompt 超过 {a['max_len']} token 时按官方规则从中间截断；摘要任务走对话模板，代码任务" + (("也走对话模板（关闭思考）" + ("，回答开头预先填入代码块标记 ```，" if a.get("code_prefix") else "，") + "取回答里第一行代码；")
+                                                     if a.get("code_chat") else "是原始文本；") + ""
          f"只取原文不少于 {a['min_words']}（摘要）/ {a['min_words_code']}（代码）个词的样本。"
          f"摘要最多生成 {a['max_gen'] or 512} 个 token。GSM8K 用 32 个示例（约 8k token）。", ""]
     tasks = [t for t in ("gov_report", "qmsum", "lcc", "repobench-p", "gsm32") if t in res]
@@ -156,6 +166,11 @@ def main():
     ap.add_argument("--n_tail", type=int, default=64)
     ap.add_argument("--out_dir", default=os.path.join(C.RESULTS_DIR, "longbench"))
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--code_chat", action="store_true", help="lcc / repobench-p through the chat template (thinking off) "
+                    "instead of raw text; the prediction is the first code line of the answer. Needed for Qwen3-32B, which "
+                    "answers the raw code prompts with prose ('Okay, let's see...')")
+    ap.add_argument("--code_prefix", default="", help="with --code_chat: text the assistant turn starts with, e.g. a "
+                    "code fence '```\\n' (pass $'```\\n'), so every config must answer with code instead of prose")
     a = ap.parse_args()
     os.makedirs(a.out_dir, exist_ok=True)
     res_path = os.path.join(a.out_dir, "results.json")
@@ -175,7 +190,8 @@ def main():
             res[task] = task_gsm8k(V2Adapter(E), cfgs, a.n_gsm, shots=32)
         else:
             res[task] = task_longbench(E, task, cfgs, a.n_sum if task in CHAT else a.n_code, a.max_len,
-                                       a.min_words if task in CHAT else a.min_words_code, a.max_gen if task in CHAT else 0, log)
+                                       a.min_words if task in CHAT else a.min_words_code, a.max_gen if task in CHAT else 0, log,
+                                       code_chat=a.code_chat, code_prefix=a.code_prefix)
         print(f"[task {task}] {(time.time()-t0)/60:.1f} min", flush=True)
         json.dump(res, open(res_path, "w"), indent=1)
         write_summary(res, os.path.join(a.out_dir, "summary.md"))

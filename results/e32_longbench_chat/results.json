@@ -1,0 +1,149 @@
+{
+ "meta": {
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "configs": [
+   "big",
+   "small",
+   "hyb",
+   "attn_small:0.1:sent",
+   "drop-attn_small:0.1:sent",
+   "specprefill:0.1",
+   "specprefill:0.3"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/s17to32n_mix8k/projector.pt",
+   "configs": "big,small,hyb,attn_small:0.1:sent,drop-attn_small:0.1:sent,specprefill:0.1,specprefill:0.3",
+   "tasks": "lcc,repobench-p",
+   "n_sum": 40,
+   "n_code": 60,
+   "n_gsm": 100,
+   "max_len": 7680,
+   "min_words": 3000,
+   "min_words_code": 1500,
+   "max_gen": 400,
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/e32_longbench_chat",
+   "force": false,
+   "code_chat": true
+  },
+  "proj_step": 12000,
+  "time": "2026-11-01 01:31:11"
+ },
+ "lcc": [
+  {
+   "config": "big",
+   "task": "lcc",
+   "n": 60,
+   "score": 0.359733100991246,
+   "frac": 1.0,
+   "prompt_tokens": 5756.466666666666
+  },
+  {
+   "config": "small",
+   "task": "lcc",
+   "n": 60,
+   "score": 0.22447652234436943,
+   "frac": 0.0,
+   "prompt_tokens": 5756.466666666666
+  },
+  {
+   "config": "hyb",
+   "task": "lcc",
+   "n": 60,
+   "score": 0.6115702807615563,
+   "frac": 0.0,
+   "prompt_tokens": 5756.466666666666
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "lcc",
+   "n": 60,
+   "score": 0.6205911084733577,
+   "frac": 0.10109250641972943,
+   "prompt_tokens": 5756.466666666666
+  },
+  {
+   "config": "drop-attn_small:0.1:sent",
+   "task": "lcc",
+   "n": 60,
+   "score": 0.23016744045018273,
+   "frac": 0.10109250641972943,
+   "prompt_tokens": 5756.466666666666
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "lcc",
+   "n": 60,
+   "score": 0.23939672182992466,
+   "frac": 0.10037396033851648,
+   "prompt_tokens": 5756.466666666666
+  },
+  {
+   "config": "specprefill:0.3",
+   "task": "lcc",
+   "n": 60,
+   "score": 0.24008608663539,
+   "frac": 0.3006745461770644,
+   "prompt_tokens": 5756.466666666666
+  }
+ ],
+ "repobench-p": [
+  {
+   "config": "big",
+   "task": "repobench-p",
+   "n": 60,
+   "score": 0.493245658814447,
+   "frac": 1.0,
+   "prompt_tokens": 7258.283333333334
+  },
+  {
+   "config": "small",
+   "task": "repobench-p",
+   "n": 60,
+   "score": 0.24670964421633929,
+   "frac": 0.0,
+   "prompt_tokens": 7258.283333333334
+  },
+  {
+   "config": "hyb",
+   "task": "repobench-p",
+   "n": 60,
+   "score": 0.47826676181847616,
+   "frac": 0.0,
+   "prompt_tokens": 7258.283333333334
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "repobench-p",
+   "n": 60,
+   "score": 0.48890717611453327,
+   "frac": 0.10107853684067364,
+   "prompt_tokens": 7258.283333333334
+  },
+  {
+   "config": "drop-attn_small:0.1:sent",
+   "task": "repobench-p",
+   "n": 60,
+   "score": 0.25613527338594655,
+   "frac": 0.10107853684067364,
+   "prompt_tokens": 7258.283333333334
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "repobench-p",
+   "n": 60,
+   "score": 0.2511355743217788,
+   "frac": 0.10132433377941888,
+   "prompt_tokens": 7258.283333333334
+  },
+  {
+   "config": "specprefill:0.3",
+   "task": "repobench-p",
+   "n": 60,
+   "score": 0.2940940554675918,
+   "frac": 0.30096338897867075,
+   "prompt_tokens": 7258.283333333334
+  }
+ ]
+}

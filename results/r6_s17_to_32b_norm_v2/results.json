@@ -1,0 +1,164 @@
+{
+ "meta": {
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "configs": [
+   "s17to32n"
+  ],
+  "args": {
+   "projectors": "s17to32n=/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/s17to32n_mix8k/projector.pt",
+   "curve_runs": "s17to32n=/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/s17to32n_mix8k",
+   "tasks": "kl,curve",
+   "n_kl": 40,
+   "n_qa": 100,
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "n_curve_kl": 6,
+   "n_curve_ret": 12,
+   "baselines": "",
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/r6_s17_to_32b_norm_v2",
+   "force": false,
+   "device": "cuda"
+  },
+  "time": "2026-10-31 08:03:12"
+ },
+ "kl": [
+  {
+   "config": "s17to32n",
+   "type": "chat",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.09593963602092118,
+   "top1_agree": 0.8964638575911522
+  },
+  {
+   "config": "s17to32n",
+   "type": "chat",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.07567934491671621,
+   "top1_agree": 0.9100826770067215
+  },
+  {
+   "config": "s17to32n",
+   "type": "code",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.12324380856007337,
+   "top1_agree": 0.92470703125
+  },
+  {
+   "config": "s17to32n",
+   "type": "code",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.13636936782859266,
+   "top1_agree": 0.91923828125
+  },
+  {
+   "config": "s17to32n",
+   "type": "math",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.01801593748969026,
+   "top1_agree": 0.971947668492794
+  },
+  {
+   "config": "s17to32n",
+   "type": "math",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.015756247003446334,
+   "top1_agree": 0.9734657287597657
+  },
+  {
+   "config": "s17to32n",
+   "type": "qa",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.22616505202895495,
+   "top1_agree": 0.8897127330303192
+  },
+  {
+   "config": "s17to32n",
+   "type": "qa",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.27373006495181473,
+   "top1_agree": 0.8621726259589195
+  },
+  {
+   "config": "s17to32n",
+   "type": "retrieval",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.02279363008196924,
+   "top1_agree": 0.9899167165160179
+  },
+  {
+   "config": "s17to32n",
+   "type": "retrieval",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.0910740836662626,
+   "top1_agree": 0.9685226753354073
+  },
+  {
+   "config": "s17to32n",
+   "type": "web",
+   "bucket": "4k",
+   "n": 40,
+   "kl": 0.10121257905848324,
+   "top1_agree": 0.9107421875
+  },
+  {
+   "config": "s17to32n",
+   "type": "web",
+   "bucket": "8k",
+   "n": 40,
+   "kl": 0.12474600402638317,
+   "top1_agree": 0.89365234375
+  }
+ ],
+ "curve": [
+  {
+   "run": "s17to32n",
+   "step": 2000,
+   "kl_4k": 0.2191212777591621,
+   "retrieval_acc": 0.775
+  },
+  {
+   "run": "s17to32n",
+   "step": 4000,
+   "kl_4k": 0.23614169644618718,
+   "retrieval_acc": 0.9125
+  },
+  {
+   "run": "s17to32n",
+   "step": 6000,
+   "kl_4k": 0.1292709533461473,
+   "retrieval_acc": 0.8708333333333333
+  },
+  {
+   "run": "s17to32n",
+   "step": 8000,
+   "kl_4k": 0.16874807132505035,
+   "retrieval_acc": 0.95
+  },
+  {
+   "run": "s17to32n",
+   "step": 10000,
+   "kl_4k": 0.16030961457120915,
+   "retrieval_acc": 0.9791666666666666
+  },
+  {
+   "run": "s17to32n",
+   "step": 12000,
+   "kl_4k": 0.12935106889805562,
+   "retrieval_acc": 0.9666666666666667
+  }
+ ]
+}

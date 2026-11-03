@@ -21,7 +21,14 @@ def all_layers(model):
 
 
 def small_hidden_states(small, input_ids):
-    """All hidden states of the small model, stacked: [Ls, B, T, d_s]. Calls the base model: no vocab logits."""
+    """All hidden states of the small model, stacked: [Ls, B, T, d_s]. Calls the base model: no vocab logits.
+    Cross-tokenizer pair (prefill/tokalign.py): the large-model ids go through the lookup table, BOS at position 0."""
+    table = getattr(small, "prefill_id_map", None)
+    if table is not None:
+        input_ids = table.to(input_ids.device)[input_ids]
+        if getattr(small, "prefill_bos", None) is not None:
+            input_ids = input_ids.clone()
+            input_ids[:, 0] = small.prefill_bos
     out = small.model(input_ids=input_ids, output_hidden_states=True, use_cache=False)
     return torch.stack(out.hidden_states, 0)
 

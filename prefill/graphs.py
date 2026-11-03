@@ -77,13 +77,14 @@ def build(rh, kind, frac, ids):
             return logits
         g1 = Graphed(head, ids, **nocopy)
         imp_graphs = {}
+        eos = S.own_eos(rh.eos)
 
         def importance(x):
             logits = g1(x)
             n = 1
             for p in range(T, T + n_lah - 1):
                 nxt = logits.argmax(-1)
-                if int(nxt) in rh.eos:
+                if int(nxt) in eos:
                     break
                 logits = lah.step(nxt, p)
                 n += 1

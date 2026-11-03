@@ -16,11 +16,13 @@
 # Submitted with --dependency=afterok on the training job.
 #   A main     : NIAH, RULER 4k/8k, QA 4k/8k, GSM8K 8-shot, code; 32B / 1.7B alone, hyb, ours 10/20%, drop-rest 20%,
 #                SpecPrefill 10/20/30%                                         -> results/e32_main
-#   B speed    : TTFT, every method CUDA-graphed, 4k/8k/16k (32k does not fit one H100 next to the 32B) -> results/e32_speed
+#   B speed    : TTFT, every method CUDA-graphed, 4k/8k (the graphs of 32B / hyb / ours at 16k OOM on one H100, seen in
+#                the r6 smoke step), plus eager TTFT (SpecPrefill look-ahead graphed) at 4k/8k/16k -> results/e32_speed
 #   C long     : QA + NIAH at 16k (32k bucket skipped, same reason)               -> results/e32_long
 #   D multiq   : shared document, 5 questions                                    -> results/e32_multiq
 #   E longbench: gov_report / QMSum / LCC / RepoBench-P + 32-shot GSM8K           -> results/e32_longbench
 #   F rarecache: fit the 1.7B -> 32B maps, then rarecache-s 0/10/30/50%           -> results/e32_rare
+#                NOT run by default: fit_rarecache.py OOMs on one H100 next to the 32B (r6 smoke step); needs 2 GPUs
 # Each part is isolated (a failure does not stop the others) and restarting skips finished tasks.
 # Run only some parts: sbatch --export=ALL,PARTS="C E" slurm/eval_32b_suite.slurm
 set -o pipefail
@@ -29,7 +31,7 @@ CK=$PREFILL_ROOT/checkpoints
 export PREFILL_SMALL_DIR=$PREFILL_ROOT/models/Qwen3-1.7B
 export PREFILL_LARGE_DIR=$PREFILL_ROOT/models/Qwen3-32B
 P=$CK/s17to32n_mix8k/projector.pt
-PARTS=${PARTS:-"A B C D E F"}
+PARTS=${PARTS:-"A B C D E"}
 step() { echo; echo "==================== [$(date '+%F %T')] $1 ===================="; }
 FAILED=""
 
@@ -46,7 +48,9 @@ part_B() {
   set -e
   step "B speed: every method CUDA-graphed"
   python scripts/eval_recompute.py --projector $P --out_dir results/e32_speed --tasks speed_allgraph --configs hyb \
-    --speed_configs $CFG --speed_lengths $LENS
+    --speed_configs $CFG --speed_lengths 4096,8192
+  python scripts/eval_recompute.py --projector $P --out_dir results/e32_speed_eager --tasks speed --configs hyb \
+    --speed_configs $CFG --speed_graph --speed_lengths $LENS
 }
 part_C() {
   set -e

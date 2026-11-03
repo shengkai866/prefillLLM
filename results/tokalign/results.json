@@ -1,0 +1,52 @@
+{
+ "Qwen3-1.7B<-Llama-3.1-8B-Instruct": {
+  "vocab": {
+   "n_large": 128256,
+   "n_small": 151669,
+   "exact": 109566,
+   "role": 7,
+   "reencoded_1to1": 0,
+   "reencoded_longest": 18683,
+   "fallback": 0
+  },
+  "pools": {
+   "qa_eval": {
+    "n": 50,
+    "exact": 0.9775897506022571,
+    "bytes_kept": 0.9853506316936768,
+    "len_ratio": 1.0430273938366188
+   },
+   "code_eval": {
+    "n": 50,
+    "exact": 0.9861780260525592,
+    "bytes_kept": 0.9929437092473339,
+    "len_ratio": 1.0223885517073592
+   }
+  }
+ },
+ "Llama-3.2-1B-Instruct<-Qwen3-8B": {
+  "vocab": {
+   "n_large": 151669,
+   "n_small": 128256,
+   "exact": 109566,
+   "role": 3,
+   "reencoded_1to1": 0,
+   "reencoded_longest": 42100,
+   "fallback": 0
+  },
+  "pools": {
+   "qa_eval": {
+    "n": 50,
+    "exact": 0.9982802934029607,
+    "bytes_kept": 0.9974305722443689,
+    "len_ratio": 0.975212605610515
+   },
+   "code_eval": {
+    "n": 50,
+    "exact": 0.9998007401081697,
+    "bytes_kept": 0.9998378500112604,
+    "len_ratio": 0.9775641303829873
+   }
+  }
+ }
+}
