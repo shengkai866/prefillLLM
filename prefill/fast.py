@@ -14,6 +14,7 @@ Fast inference path (same math as prefill/kv.py, much less overhead). Works with
 
 Batch size 1 throughout (latency setting).
 """
+import os
 import time
 
 import torch
@@ -249,6 +250,17 @@ class FoldedProjectorKV:
             v = (Y[..., self.KV:2 * self.KV].float() * inv).to(self.dt).view(Ll, nc, self.Hkv, self.D).transpose(1, 2)
             kdst[:, :, c0:c1] = rope(k, cos[c0:c1], sin[c0:c1])
             vdst[:, :, c0:c1] = v
+
+
+def build_fold(projector, large_fast, mode=None):
+    """The projector -> KV stage: FusedFoldKV (Triton, prefill/fold_fused.py) or the eager FoldedProjectorKV.
+    mode / $PREFILL_FOLD = fused (default) | eager; CPU always gets the eager version."""
+    mode = mode or os.environ.get("PREFILL_FOLD", "fused")
+    if mode == "fused" and large_fast.embed.is_cuda:
+        from .fold_fused import FusedFoldKV
+        return FusedFoldKV(projector, large_fast)
+    assert mode in ("fused", "eager"), mode
+    return FoldedProjectorKV(projector, large_fast)
 
 
 class FastBig:

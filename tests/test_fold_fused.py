@@ -69,12 +69,12 @@ def err(x, ref):
     return d.max().item(), d.mean().item() / ref.abs().mean().item()
 
 
-def check(name, Ll, Hkv, k_norm, dev, dt, n=512, Ls=28, d_s=1024, d_l=4096, H=32, D=128):
-    print(f"\n=== {name}: Ll={Ll} Hkv={Hkv} D={D} k_norm={k_norm}, n={n}")
+def check(name, Ll, Hkv, k_norm, dev, dt, variant=2, n=512, Ls=28, d_s=1024, d_l=4096, H=32, D=128):
+    print(f"\n=== {name}: Ll={Ll} Hkv={Hkv} D={D} k_norm={k_norm}, n={n}, variant={variant}")
     lf = fake_large(Ll, d_l, H, Hkv, D, dev, dt, k_norm=k_norm)
     p = fake_projector(Ls, Ll, d_s, d_l)
     eager = FoldedProjectorKV(p, lf)
-    fused = FusedFoldKV(p, lf, warm=False)
+    fused = FusedFoldKV(p, lf, warm=False, variant=variant)
     torch.manual_seed(1)
     hs = (torch.randn(Ls, n, d_s, device=dev) * torch.logspace(0, 2, Ls, device=dev)[:, None, None]).to(dt)
     cos, sin = rope_table(n + 7, D, dev, dt)
@@ -114,18 +114,20 @@ def bench(lengths, reps, dev, dt, Ls=28, Ll=36, d_s=1024, d_l=4096, H=32, Hkv=8,
     lf = fake_large(Ll, d_l, H, Hkv, D, dev, dt)
     p = fake_projector(Ls, Ll, d_s, d_l)
     eager = FoldedProjectorKV(p, lf)
-    fused = FusedFoldKV(p, lf)  # warm(): autotune at 4k
-    from prefill.fold_fused import _fold_kv_kernel
-    print(f"  best config: {_fold_kv_kernel.best_config}")
-    for c, t in sorted(_fold_kv_kernel.configs_timings.items(), key=lambda x: x[1]):
-        print(f"    {t:8.3f} ms  {c}")
+    from prefill.fold_fused import _fold_kv_kernel, _fold_kv_kernel2
+    fused1 = FusedFoldKV(p, lf, variant=1)  # warm(): autotune at 4k
+    fused = FusedFoldKV(p, lf, variant=2)
+    for kern in (_fold_kv_kernel, _fold_kv_kernel2):
+        print(f"  {kern.fn.__name__} best: {kern.best_config}")
+        for c, t in sorted(kern.configs_timings.items(), key=lambda x: x[1]):
+            print(f"    {t:8.3f} ms  {c}")
     for n in lengths:
         hs = torch.randn(Ls, n, d_s, device=dev, dtype=dt)
         cos, sin = rope_table(n, D, dev, dt)
         kb = torch.empty(Ll, Hkv, n + 72, D, device=dev, dtype=dt)
         vb = torch.empty_like(kb)
         row = []
-        for nm, f in (("eager", eager), ("fused", fused)):
+        for nm, f in (("eager", eager), ("fused1", fused1), ("fused", fused)):
             ts = []
             for i in range(reps + 2):
                 torch.cuda.synchronize()
@@ -142,8 +144,8 @@ def bench(lengths, reps, dev, dt, Ls=28, Ll=36, d_s=1024, d_l=4096, H=32, Hkv=8,
             torch.cuda.synchronize()
             ts.append((time.perf_counter() - t0) * 1e3)
         act = sorted(ts[2:])[len(ts[2:]) // 2]
-        print(f"  n={n:6d}: eager {row[0]:7.1f} ms   fused {row[1]:7.1f} ms   speedup {row[0] / row[1]:.2f}x"
-              f"   (fused = activations {act:.1f} + kernel {row[1] - act:.1f})", flush=True)
+        print(f"  n={n:6d}: eager {row[0]:7.1f} ms   fused-v1 {row[1]:7.1f} ms   fused-v2 {row[2]:7.1f} ms   speedup {row[0] / row[2]:.2f}x"
+              f"   (v2 = activations {act:.1f} + kernel {row[2] - act:.1f})", flush=True)
         del hs, cos, sin, kb, vb
         torch.cuda.empty_cache()
 
@@ -156,8 +158,9 @@ def main():
     a = ap.parse_args()
     dev, dt = torch.device("cuda"), torch.bfloat16
     if not a.skip_check:
-        check("qwen3-8b-like", 36, 8, True, dev, dt)
-        check("llama-like (no k_norm)", 6, 8, False, dev, dt, n=300)
+        for v in (1, 2):
+            check("qwen3-8b-like", 36, 8, True, dev, dt, variant=v)
+            check("llama-like (no k_norm)", 6, 8, False, dev, dt, variant=v, n=300)
     bench([int(x) for x in a.lengths.split(",")], a.reps, dev, dt)
     print("\nall done")
 

@@ -42,7 +42,7 @@ import torch  # noqa: E402
 
 from evaluate_v2 import mean, qa_scores, task_code, task_gsm8k  # noqa: E402
 from prefill import config as C  # noqa: E402
-from prefill.fast import FastBig, FastQwen3, FoldedProjectorKV, kv_to_dynamic_cache, time_call  # noqa: E402
+from prefill.fast import FastBig, FastQwen3, build_fold, kv_to_dynamic_cache, time_call  # noqa: E402
 from prefill.graphs import build as build_graphs  # noqa: E402
 from prefill.kv import greedy_decode, split_prompt, true_prefill  # noqa: E402
 from prefill.mixdata import PromptPool, Tok  # noqa: E402
@@ -109,7 +109,7 @@ class Engine:
         # sentence/line boundary tokens for 'sent' units
         boundary = torch.tensor([any(ch in tok.decode([i]) for ch in ".!?\n") for i in range(len(tok))], device=dev)
         self.eos = eos_ids(tok)
-        self.rh = RecomputeHybrid(self.S, self.L, FoldedProjectorKV(p, self.L), n_sink=n_sink, n_tail=n_tail, boundary=boundary,
+        self.rh = RecomputeHybrid(self.S, self.L, build_fold(p, self.L), n_sink=n_sink, n_tail=n_tail, boundary=boundary,
                                   eos=self.eos)
         self.rc = RaReCache(self.S, self.L, torch.load(rarecache_fit, map_location="cpu")) if rarecache_fit else None
 
