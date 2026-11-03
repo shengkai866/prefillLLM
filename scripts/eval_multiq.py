@@ -222,8 +222,8 @@ def main():
     log = GenLog(os.path.join(a.out_dir, "generations.jsonl"))
     redo = {c for c in a.redo.split(",") if c}
     for task in a.tasks.split(","):
-        if task == "qa" and not a.force:  # per config: keep finished configs, run the missing / redone ones
-            keep = [r for r in res.get("qa", []) if r["config"] not in redo]
+        if task == "qa":  # per config: keep finished configs, run the missing / redone ones (--force: redo all)
+            keep = [] if a.force else [r for r in res.get("qa", []) if r["config"] not in redo]
             todo = [c for c in cfgs if c not in {r["config"] for r in keep}]
             if not todo:
                 print("[task qa] already done, skipping")
