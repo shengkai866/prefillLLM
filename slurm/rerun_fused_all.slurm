@@ -24,7 +24,8 @@
 #   RaReCache (existing fit.pt reused), QuALITY (in place: results/quality_<pair>, quality_mq_<pair>), long-context bench
 #   (in place: results/bench_<pair>, summarised by scripts/summarize_bench.py). Everything runs with --force (nothing is
 #   skipped); every step is isolated (a failure is reported at the end and does not stop the rest).
-# Estimated ~14 h per pair (~3 days total). Restart with START_PAIR=<pair> [START_STEP=<step>] to resume.
+# Estimated ~14 h per pair (~3 days total). Resume: START_PAIR=<pair> [START_STEP=<step>] (phase B), FORCE_SPEED= (phase A keeps
+# finished speed results).
 #   sbatch slurm/rerun_fused_all.slurm
 #   sbatch --export=ALL,PAIRS="06 17" slurm/rerun_fused_all.slurm
 set -o pipefail
@@ -36,6 +37,7 @@ PAIRS=${PAIRS:-"06 17 ll xq17ll8 xll1q8"}
 START_PAIR=${START_PAIR:-}
 START_STEP=${START_STEP:-}
 LEN=4096,8192,16384,32768
+FORCE_SPEED=${FORCE_SPEED---force}  # phase A: FORCE_SPEED= (empty) keeps speed results that already exist (resume)
 RC=rarecache-s:0,rarecache-s:0.1,rarecache-s:0.3,rarecache-s:0.5
 step() { echo; echo "==================== [$(date '+%F %T')] $1 ===================="; }
 FAILED=""
@@ -70,10 +72,10 @@ run_step() {  # $1 pair, $2 step; runs in a subshell so the pair's environment d
     step "$PAIR / $STEP"
     case $STEP in
       speed)     ev python scripts/eval_recompute.py --projector $P --out_dir ${R}_speed --tasks speed_allgraph --configs hyb \
-                   --speed_configs $CFG --speed_lengths $LEN --force ;;
+                   --speed_configs $CFG --speed_lengths $LEN $FORCE_SPEED ;;
       speed_eager) export PREFILL_FOLD=eager  # ours without the fused kernel (large alone again as the in-run reference)
                  ev python scripts/eval_recompute.py --projector $P --out_dir ${R}_speed_eagerfold --tasks speed_allgraph --configs hyb \
-                   --speed_configs big,hyb,attn_small:0.1:sent,attn_small:0.2:sent --speed_lengths $LEN --force ;;
+                   --speed_configs big,hyb,attn_small:0.1:sent,attn_small:0.2:sent --speed_lengths $LEN $FORCE_SPEED ;;
       main)      ev python scripts/eval_recompute.py --projector $P --out_dir ${R}_main --tasks niah,ruler,qa,gsm8k,code --configs $CFG --force ;;
       long)      ev python scripts/eval_recompute.py --projector $P --out_dir ${R}_long --tasks niah_long,qa_long \
                    --configs big,hyb,attn_small:0.1:sent,drop-attn_small:0.2:sent,specprefill:0.1,specprefill:0.3 --force ;;
@@ -92,7 +94,7 @@ run_step() {  # $1 pair, $2 step; runs in a subshell so the pair's environment d
     [ -z "$FAILED" ] || echo "FAILED_IN_SUBSHELL:$FAILED" )
 }
 run() {  # wrapper: collect failures reported by the subshell
-  out=$(run_step "$@" 2>&1 | tee /dev/stderr | grep "^FAILED_IN_SUBSHELL:" | tail -1)
+  out=$(run_step "$@" 2>&1 | tee >(cat >&2) | grep "^FAILED_IN_SUBSHELL:" | tail -1)  # NOT tee /dev/stderr: that reopens and truncates the log
   [ -z "$out" ] || FAILED="$FAILED ${out#FAILED_IN_SUBSHELL:}"
 }
 
