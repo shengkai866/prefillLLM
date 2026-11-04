@@ -28,16 +28,17 @@ FAILED=""
 ev() { "$@" || { FAILED="$FAILED $1:$PREFILL_FOLD"; echo "!!!!!!!! FAILED: $*"; }; }
 GCFG=big,small,hyb,attn_small:0.1:sent,attn_small:0.2:sent,drop-attn_small:0.2:sent,specprefill:0.1,specprefill:0.2,specprefill:0.3
 LEN=4096,8192,16384,32768
-for mode in eager fused; do
+MODES=${MODES:-eager fused}  # TAG: suffix of the results dirs (re-runs after kernel changes)
+for mode in $MODES; do
   export PREFILL_FOLD=$mode
   step "speed_allgraph, fold=$mode"
-  ev python scripts/eval_recompute.py --projector $P --out_dir results/speed_fold_${mode}_$PAIR \
+  ev python scripts/eval_recompute.py --projector $P --out_dir results/speed_fold_${mode}${TAG}_$PAIR \
     --tasks speed_allgraph --configs hyb --speed_configs $GCFG --speed_lengths $LEN
 done
-for mode in eager fused; do
+for mode in $MODES; do
   export PREFILL_FOLD=$mode
   step "per-stage breakdown (bench_speed), fold=$mode"
-  ev python scripts/bench_speed.py --projector $P --sections speed --lengths $LEN --out_dir results/speed_fold_stages_${mode}_$PAIR
+  ev python scripts/bench_speed.py --projector $P --sections speed --lengths $LEN --out_dir results/speed_fold_stages_${mode}${TAG}_$PAIR
 done
 step "all done${FAILED:+ — FAILED:$FAILED}"
 [ -z "$FAILED" ]
