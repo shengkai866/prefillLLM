@@ -30,8 +30,8 @@ middle tokens. The comparison rows say whether ours wins against SpecPrefill at 
 | | Qwen 0.6B → 8B (L40S) | Qwen 1.7B → 32B (H100) | Llama 1B → 8B (L40S) |
 |---|---|---|---|
 | KL to large model 4k / 8k | 0.136 / — | 0.098 / 0.120 | 0.105 / 0.120 |
-| TTFT speedup, no recompute (4k / 8k / 16k / 32k) | 2.78 / 3.16 / 2.97 / 2.92 | 4.58 / 5.39 / 6.16* / — | 2.67 / 3.00 / 3.19 / 3.39 |
-| TTFT speedup, ours | 2.29 / 2.31 / 2.06 / 1.87 | 3.04 / 2.87 / 2.73* / — | 2.19 / 2.25 / 2.14 / 2.05 |
+| TTFT speedup, no recompute (4k / 8k / 16k / 32k) | **3.91 / 4.48 / 3.93 / 3.67** (eager fold: 2.78 / 3.16 / 2.97 / 2.92) | 4.58 / 5.39 / 6.16* / — | 2.67 / 3.00 / 3.19 / 3.39 |
+| TTFT speedup, ours | **2.98 / 2.94 / 2.48 / 2.15** (eager fold: 2.29 / 2.31 / 2.06 / 1.87) | 3.04 / 2.87 / 2.73* / — | 2.19 / 2.25 / 2.14 / 2.05 |
 | TTFT speedup, SpecPrefill 10% | 2.51 / 2.98 / 2.87 / 2.84 | 3.14 / 3.74 / 4.53* / — | 2.42 / 2.88 / 3.15 / 3.36 |
 | RULER 4k, large / ours | 0.970 / 0.897 | 0.976 / 0.914 (20%: 0.973) | 0.974 / 0.928 |
 | vs SpecPrefill: RULER 4k / 8k | tie / slightly lower (−0.02) | tie / lower (−0.06) | tie / lower (−0.07) |
@@ -44,6 +44,20 @@ middle tokens. The comparison rows say whether ours wins against SpecPrefill at 
 
 \* 32B at 16k is eager: the CUDA graphs do not fit on one H100. 32B does not fit 32k on one H100.
 
+The bold Qwen 0.6B → 8B numbers use the fused Triton projector → KV kernel (`prefill/fold_fused.py`, default since
+2026-11-04, `PREFILL_FOLD=eager` restores the old path); the 32B and Llama columns were measured with the eager fold and
+will move by a similar amount. First-token latency in ms (L40S, every method CUDA-graphed, `results/speed_summary.md`):
+
+| Qwen 0.6B → 8B | 4k | 8k | 16k | 32k |
+|---|---|---|---|---|
+| 8B alone | 386 | 911 | 2034 | 5039 |
+| projected cache, no recompute: eager fold → fused fold | 142 → **99** | 294 → **203** | 700 → **518** | 1763 → **1371** |
+| ours (recompute 10%): eager fold → fused fold | 172 → **130** | 403 → **310** | 1007 → **821** | 2741 → **2339** |
+| SpecPrefill 10% / 20% / 30% | 154 / 188 / 221 | 305 / 372 / 448 | 709 / 864 / 1064 | 1763 / 2177 / 2601 |
+| of which the fold stage: eager → fused | 60 → 18 | 122 → 35 | 246 → 67 | 491 → 136 |
+
+Qwen 1.7B → 8B, ours: 228 → **180** / 526 → **418** / 1285 → **1072** / 3260 → **2837** ms (SpecPrefill 10%: 220 / 428 / 965 / 2221).
+
 The overall picture:
 - **Where we win.** Ours wins on tasks that need the full context: few-shot GSM8K, LongBench code completion, and
   several questions about one document. SpecPrefill's cache is selected for one question, so it fails on later
@@ -55,6 +69,7 @@ The overall picture:
   and 32B targets alike. Without it the projector never learned retrieval.
 
 ## Reports (newest first)
+- `REPORT_2026-11-03_fold_kernel.md` — fused Triton projector → KV kernel: fold 60 → 18 ms @4k, ours now as fast as SpecPrefill 10% at 4k–8k; verified on real weights (quality unchanged)
 | File | Content |
 |---|---|
 | `REPORT_2026-11-02_32B_llama.md` | 1.7B → 32B; Llama 1B → 8B; cross-family setup (C2C token alignment); appendix mapping **every** `results/` dir to a report |
