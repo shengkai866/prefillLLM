@@ -114,19 +114,6 @@ def check(name, Ll, Hkv, k_norm, dev, dt, variant=2, n=512, Ls=28, d_s=1024, d_l
     torch.cuda.empty_cache()
 
 
-def _mix_only(fused, H1):
-    import triton
-    from prefill.fold_fused import _mix_silu_kernel
-    Ls, n, d_mid = H1.shape
-    Ll = fused.mix.shape[0]
-    a = torch.empty(Ll, n, d_mid, dtype=H1.dtype, device=H1.device)
-    total = n * d_mid
-    pad = lambda v: max(16, triton.next_power_of_2(v))
-    _mix_silu_kernel[lambda meta: (triton.cdiv(total, meta["BLOCK"]),)](
-        H1, fused.mix, fused.b1, a, total, H1.stride(0), a.stride(0), LS=Ls, LL=Ll, LS_PAD=pad(Ls), LL_PAD=pad(Ll), DMID=d_mid)
-    return a
-
-
 def bench(lengths, reps, dev, dt, Ls=28, Ll=36, d_s=1024, d_l=4096, H=32, Hkv=8, D=128):
     print(f"\n=== speed on {torch.cuda.get_device_name()} (ms per call, writes [Ll,Hkv,T,D] slice; median of {reps})")
     lf = fake_large(Ll, d_l, H, Hkv, D, dev, dt)
@@ -170,10 +157,12 @@ def bench(lengths, reps, dev, dt, Ls=28, Ll=36, d_s=1024, d_l=4096, H=32, Hkv=8,
               f"   (v2 = activations {act[1]:.1f} [eager act {act[0]:.1f}] + kernel {row[2] - act[1]:.1f})", flush=True)
         # parts of the activation step
         from prefill.projector import rms_unit
-        hc = rms_unit(hs)
-        H1 = F.linear(hc, fused.W1)
-        parts = {"rms_unit": lambda: rms_unit(hs), "W1 linear": lambda: F.linear(hc, fused.W1),
-                 "mix+silu (triton)": lambda: fused.activations.__func__(fused, hs) if False else _mix_only(fused, H1)}
+        H1 = F.linear(hs, fused.W1).contiguous()
+        r = fused.row_rms(hs)
+        r0 = torch.rsqrt(hs.float().pow(2).mean(-1) + 1e-6)
+        assert ((r - r0).abs() / r0).max() < 1e-3, "row_rms differs from torch"
+        parts = {"rms_unit (eager)": lambda: rms_unit(hs), "row_rms (triton)": lambda: fused.row_rms(hs),
+                 "W1 linear": lambda: F.linear(hs, fused.W1), "mix+silu (triton)": lambda: fused.mix_silu(H1, r)}
         out = []
         for nm, fn in parts.items():
             ts = []
@@ -182,7 +171,7 @@ def bench(lengths, reps, dev, dt, Ls=28, Ll=36, d_s=1024, d_l=4096, H=32, Hkv=8,
                 ts.append((time.perf_counter() - t0) * 1e3)
             out.append(f"{nm} {sorted(ts[2:])[len(ts[2:]) // 2]:.1f}")
         print(f"           activation parts (ms): " + ", ".join(out), flush=True)
-        del hc, H1
+        del H1, r, r0
         del hs, cos, sin, kb, vb
         torch.cuda.empty_cache()
 

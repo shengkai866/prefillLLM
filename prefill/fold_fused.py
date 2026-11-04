@@ -224,13 +224,25 @@ def _configs_mix():
     return [triton.Config({"BLOCK": b}, num_warps=w, num_stages=st) for b, w, st in ((128, 4, 2), (256, 4, 2), (256, 8, 2), (512, 8, 2))]
 
 
+@triton.jit
+def _row_rms_kernel(X, OUT, eps, D: tl.constexpr, BD: tl.constexpr):
+    """OUT[row] = rsqrt(mean(X[row, :]^2) + eps) in fp32, X read once in its own dtype (no fp32 copy of X)."""
+    row = tl.program_id(0).to(tl.int64)
+    ss = tl.zeros([BD], dtype=tl.float32)
+    for d0 in range(0, D, BD):
+        x = tl.load(X + row * D + d0 + tl.arange(0, BD)).to(tl.float32)
+        ss += x * x
+    tl.store(OUT + row, tl.math.rsqrt(tl.sum(ss, axis=0) / D + eps))
+
+
 @triton.autotune(configs=_configs_mix(), key=[])
 @triton.jit
-def _mix_silu_kernel(H1, MIX, B1, OUT, total, s_h, s_o,
+def _mix_silu_kernel(H1, MIX, B1, R, OUT, total, n, s_h, s_o,
                      LS: tl.constexpr, LL: tl.constexpr, LS_PAD: tl.constexpr, LL_PAD: tl.constexpr,
-                     DMID: tl.constexpr, BLOCK: tl.constexpr):
-    """a[l, f] = silu(sum_s mix[l, s] H1[s, f] + b1[f % d_mid]) over the flat token*feature index f: every H1 element
-    is read once (the eager K=28 matmul + bias + silu are three passes over [Ll, n, d_mid])."""
+                     DMID: tl.constexpr, HAS_R: tl.constexpr, BLOCK: tl.constexpr):
+    """a[l, f] = silu(sum_s mix[l, s] r[s, m] H1[s, f] + b1[f % d_mid]) over the flat token*feature index f (m = f // d_mid):
+    every H1 element is read once (the eager K=28 matmul + bias + silu are three passes over [Ll, n, d_mid]).
+    r[s, m] = 1 / rms(h_s[m]) is the projector's input normalisation, applied after the linear W1 (W1 is linear)."""
     f0 = tl.program_id(0) * BLOCK
     rf = f0 + tl.arange(0, BLOCK)
     rs = tl.arange(0, LS_PAD)
@@ -238,6 +250,9 @@ def _mix_silu_kernel(H1, MIX, B1, OUT, total, s_h, s_o,
     mask_f = rf < total
     h = tl.load(H1 + rs[:, None] * s_h + rf[None, :], mask=(rs[:, None] < LS) & mask_f[None, :], other=0.0)
     mix = tl.load(MIX + rl[:, None] * LS + rs[None, :], mask=(rl[:, None] < LL) & (rs[None, :] < LS), other=0.0)
+    if HAS_R:
+        r = tl.load(R + rs * n + f0 // DMID, mask=rs < LS, other=0.0)  # [LS_PAD] fp32, the block lies in one token
+        mix = (mix.to(tl.float32) * r[None, :]).to(mix.dtype)
     x = tl.dot(mix, h) + tl.load(B1 + (f0 % DMID) + tl.arange(0, BLOCK)).to(tl.float32)[None, :]
     y = x * tl.sigmoid(x)
     tl.store(OUT + rl[:, None].to(tl.int64) * s_o + rf[None, :], y.to(OUT.dtype.element_ty),
@@ -295,22 +310,36 @@ class FusedFoldKV(FoldedProjectorKV):
         Ll, n = self.mix.shape[0], hs.shape[1]
         return F.silu(torch.matmul(self.mix, H1.reshape(H1.shape[0], -1)).view(Ll, n, -1) + self.b1)
 
-    def activations(self, hs):
-        """Same as activations_eager, with the layer mix + bias + silu in one Triton pass over H1."""
-        if not self.fuse_mix:
-            return self.activations_eager(hs)
-        hc = rms_unit(hs) if self.in_norm else hs
-        H1 = F.linear(hc, self.W1).contiguous()  # [Ls, n, d_mid]
+    def row_rms(self, hs, eps=1e-6):
+        """[Ls, n] fp32: 1 / rms over d_s of every token of every small layer (= prefill.projector.rms_unit's scale)."""
+        Ls, n, d_s = hs.shape
+        hs = hs.contiguous()
+        out = torch.empty(Ls, n, dtype=torch.float32, device=hs.device)
+        bd = min(d_s, 1024)
+        assert d_s % bd == 0
+        _row_rms_kernel[(Ls * n,)](hs, out, eps, D=d_s, BD=bd, num_warps=4)
+        return out
+
+    def mix_silu(self, H1, r):
+        """a = silu(mix · (r ⊙ H1) + b1) in one pass; r [Ls, n] or None."""
         Ls, n, d_mid = H1.shape
         Ll = self.mix.shape[0]
         a = torch.empty(Ll, n, d_mid, dtype=H1.dtype, device=H1.device)
         total = n * d_mid
         pad = lambda v: max(16, triton.next_power_of_2(v))
-        assert d_mid % 512 == 0
+        assert d_mid % 512 == 0 and H1.is_contiguous()
         _mix_silu_kernel[lambda meta: (triton.cdiv(total, meta["BLOCK"]),)](
-            H1, self.mix, self.b1, a, total, H1.stride(0), a.stride(0),
-            LS=Ls, LL=Ll, LS_PAD=pad(Ls), LL_PAD=pad(Ll), DMID=d_mid)
+            H1, self.mix, self.b1, r if r is not None else a, a, total, n, H1.stride(0), a.stride(0),
+            LS=Ls, LL=Ll, LS_PAD=pad(Ls), LL_PAD=pad(Ll), DMID=d_mid, HAS_R=r is not None)
         return a
+
+    def activations(self, hs):
+        """Same math as activations_eager: W1 applied to the raw hidden states (bf16 GEMM, no fp32 copy), the input
+        normalisation as a per-token scale folded into the layer mix, and mix + bias + silu in one Triton pass."""
+        if not self.fuse_mix:
+            return self.activations_eager(hs)
+        H1 = F.linear(hs, self.W1).contiguous()  # [Ls, n, d_mid]
+        return self.mix_silu(H1, self.row_rms(hs) if self.in_norm else None)
 
     def __call__(self, hs, cos, sin, kdst, vdst, n_layers=None):
         n = hs.shape[1]
