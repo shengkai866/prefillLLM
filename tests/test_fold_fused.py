@@ -119,7 +119,8 @@ def bench(lengths, reps, dev, dt, Ls=28, Ll=36, d_s=1024, d_l=4096, H=32, Hkv=8,
     fused = FusedFoldKV(p, lf, variant=2)
     for kern in (_fold_kv_kernel, _fold_kv_kernel2):
         print(f"  {kern.fn.__name__} best: {kern.best_config}")
-        for c, t in sorted(kern.configs_timings.items(), key=lambda x: x[1]):
+        tm = {c: (t[0] if isinstance(t, (list, tuple)) else t) for c, t in kern.configs_timings.items()}  # do_bench: [mean,..]
+        for c, t in sorted(tm.items(), key=lambda x: x[1]):
             print(f"    {t:8.3f} ms  {c}")
     for n in lengths:
         hs = torch.randn(Ls, n, d_s, device=dev, dtype=dt)
