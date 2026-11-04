@@ -229,5 +229,49 @@
    "frac": 0.3000838135064543,
    "prompt_tokens": 7246.283333333334
   }
+ ],
+ "gsm32": [
+  {
+   "config": "big",
+   "n": 100,
+   "accuracy": 0.9,
+   "format_follow": 0.94,
+   "prompt_tokens": 7031.23
+  },
+  {
+   "config": "hyb",
+   "n": 100,
+   "accuracy": 0.92,
+   "format_follow": 0.61,
+   "prompt_tokens": 7031.23
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "n": 100,
+   "accuracy": 0.89,
+   "format_follow": 0.8,
+   "prompt_tokens": 7031.23
+  },
+  {
+   "config": "drop-attn_small:0.1:sent",
+   "n": 100,
+   "accuracy": 0.88,
+   "format_follow": 0.18,
+   "prompt_tokens": 7031.23
+  },
+  {
+   "config": "specprefill:0.1",
+   "n": 100,
+   "accuracy": 0.91,
+   "format_follow": 0.38,
+   "prompt_tokens": 7031.23
+  },
+  {
+   "config": "specprefill:0.3",
+   "n": 100,
+   "accuracy": 0.9,
+   "format_follow": 0.85,
+   "prompt_tokens": 7031.23
+  }
  ]
 }

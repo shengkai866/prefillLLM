@@ -50,10 +50,10 @@ python scripts/prepare_quality.py || exit 1
 step "smoke: 4 questions, 2 articles"
 python scripts/eval_recompute.py --projector $P --out_dir results/quality_smoke_$PAIR --tasks quality --n_quality 4 --configs big,hyb,attn_small:0.1:sent,specprefill:0.1 --force || exit 1
 python scripts/prepare_quality.py --n_articles 2 --suffix _smoke && \
-python scripts/eval_multiq.py --projector $P --out_dir results/quality_smoke_$PAIR --pool quality_multiq_smoke --tasks qa --configs big,ours-acc:0.03:sent,spec-each:0.1 --force || exit 1
+python scripts/eval_multiq.py --projector $P --out_dir results/quality_smoke_$PAIR --pool quality_multiq_smoke --tasks qa --configs big,ours-acc:0.03:sent,spec-each:0.1 --q_max 320 --force || exit 1
 step "single question"
 ev python scripts/eval_recompute.py --projector $P --out_dir results/quality_$PAIR --tasks quality --configs $CFG
 step "multi-question (all questions of an article on one cache)"
-ev python scripts/eval_multiq.py --projector $P --out_dir results/quality_mq_$PAIR --pool quality_multiq --tasks qa --configs $MQ
+ev python scripts/eval_multiq.py --projector $P --out_dir results/quality_mq_$PAIR --pool quality_multiq --tasks qa --configs $MQ --q_max 320  # question blocks are up to 270 tokens
 step "all done${FAILED:+ — FAILED:$FAILED}"
 [ -z "$FAILED" ]

@@ -62,18 +62,19 @@ def small_prefill_scored(S, ids, n_q, lo, hi):
     T = ids.shape[0]
     cos, sin = S.cos[:T], S.sin[:T]
     h = F.embedding(S.ids_in(ids, first=True), S.embed)
-    hs = [h]
+    hs = torch.empty(len(S.layers) + 1, T, h.shape[-1], dtype=h.dtype, device=h.device)  # in place, see FastQwen3.prefill
+    hs[0] = h
     score = torch.zeros(hi - lo, dtype=torch.float32, device=ids.device)
     qpos = torch.arange(T - n_q, T, device=ids.device)
-    for lw in S.layers:
+    for i, lw in enumerate(S.layers):
         q, k, v = S._qkv(lw, rms(h, lw["ln1"], S.eps), cos, sin)
         o = F.scaled_dot_product_attention(q[None], k.repeat_interleave(S.rep, 0)[None],
                                            v.repeat_interleave(S.rep, 0)[None], is_causal=True, scale=S.scaling)[0]
         score += attn_mass(q[:, T - n_q:], k, qpos, lo, hi, S.scaling)
         h = S._mlp(lw, S._out(lw, h, o))
-        hs.append(h)
+        hs[i + 1] = h
     hs[-1] = rms(h, S.norm, S.eps)
-    return torch.stack(hs, 0), score / len(S.layers)
+    return hs, score / len(S.layers)
 
 
 class LookaheadGraph:

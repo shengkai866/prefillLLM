@@ -122,7 +122,10 @@ class FastQwen3:
         T = ids.shape[0]
         cos, sin = (self.cos[:T], self.sin[:T]) if pos is None else (self.cos[pos], self.sin[pos])
         h = F.embedding(self.ids_in(ids, first=pos is None), self.embed)
-        hs = [h] if collect else None
+        hs = None
+        if collect:  # written in place: a list + torch.stack would hold every layer twice (7.8 GB for 1.7B at 64k)
+            hs = torch.empty(len(self.layers) + 1, T, h.shape[-1], dtype=h.dtype, device=h.device)
+            hs[0] = h
         for i, lw in enumerate(self.layers):
             q, k, v = self._qkv(lw, rms(h, lw["ln1"], self.eps), cos, sin)
             if kbuf is not None:
@@ -135,13 +138,13 @@ class FastQwen3:
                                                scale=self.scaling)[0]
             h = self._mlp(lw, self._out(lw, h, o))
             if collect:
-                hs.append(h)
+                hs[i + 1] = h
         out_logits = None
         if collect:
             hs[-1] = rms(h, self.norm, self.eps)  # HF appends the *normed* final state
         if logits:
             out_logits = F.linear(rms(h[-1:], self.norm, self.eps), self.lm_head)
-        return out_logits, (torch.stack(hs, 0) if collect else None)
+        return out_logits, hs
 
     def extend(self, ids, cos, sin, kbuf, vbuf, segs, mask):
         """

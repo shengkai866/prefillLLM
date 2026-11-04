@@ -1,0 +1,605 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "big",
+   "attn_small:0.1:sent",
+   "specprefill:0.1",
+   "specprefill:0.2"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r2_mix8k/projector.pt",
+   "configs": "big,attn_small:0.1:sent,specprefill:0.1,specprefill:0.2",
+   "tasks": "lastingbench,musique,qasper,longhealth,contractnli",
+   "max_len": 65536,
+   "suffix": "",
+   "n": 0,
+   "yarn": "auto",
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/bench_06",
+   "force": false
+  },
+  "proj_step": 12000,
+  "time": "2026-11-03 23:50:02",
+  "yarn": 0,
+  "longest_prompt": 17910,
+  "prompt_tokens": {
+   "lastingbench": 13652.933333333332,
+   "musique": 16354.266666666666,
+   "qasper": 4821.151315789473,
+   "longhealth": 12433.1625,
+   "contractnli": 2375.4266666666667
+  }
+ },
+ "lastingbench": [
+  {
+   "config": "big",
+   "task": "lastingbench",
+   "subset": "all",
+   "n": 150,
+   "score": 0.45174666611763387,
+   "frac": 1.0,
+   "sec_per_item": 2.0113741985956826,
+   "n_oom": 0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "lastingbench",
+   "subset": "all",
+   "n": 150,
+   "score": 0.3838895733895734,
+   "frac": 0.10152797284043111,
+   "sec_per_item": 1.0938467295964558,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "lastingbench",
+   "subset": "all",
+   "n": 150,
+   "score": 0.38550488522527504,
+   "frac": 0.10000074679174281,
+   "sec_per_item": 0.7332490332921346,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.2",
+   "task": "lastingbench",
+   "subset": "all",
+   "n": 150,
+   "score": 0.4356714450424128,
+   "frac": 0.19999143385469034,
+   "sec_per_item": 0.8450906928380331,
+   "n_oom": 0
+  }
+ ],
+ "musique": [
+  {
+   "config": "big",
+   "task": "musique",
+   "subset": "all",
+   "n": 120,
+   "score": 0.3641073456086132,
+   "frac": 1.0,
+   "sec_per_item": 2.632408831516902,
+   "n_oom": 0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "musique",
+   "subset": "all",
+   "n": 120,
+   "score": 0.29723547338052586,
+   "frac": 0.10100010512328128,
+   "sec_per_item": 1.396795537074407,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "musique",
+   "subset": "all",
+   "n": 120,
+   "score": 0.3391132339742047,
+   "frac": 0.10011439509079183,
+   "sec_per_item": 0.9062090992927552,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.2",
+   "task": "musique",
+   "subset": "all",
+   "n": 120,
+   "score": 0.35520090482845296,
+   "frac": 0.20011246606748362,
+   "sec_per_item": 1.0765873968601227,
+   "n_oom": 0
+  }
+ ],
+ "qasper": [
+  {
+   "config": "big",
+   "task": "qasper",
+   "subset": "all",
+   "n": 304,
+   "score": 0.570399927398712,
+   "frac": 1.0,
+   "sec_per_item": 0.9400675085030104,
+   "n_oom": 0
+  },
+  {
+   "config": "big",
+   "task": "qasper",
+   "subset": "span",
+   "n": 245,
+   "score": 0.5363329711396263,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "big",
+   "task": "qasper",
+   "subset": "yesno",
+   "n": 59,
+   "score": 0.711864406779661,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "qasper",
+   "subset": "all",
+   "n": 304,
+   "score": 0.47591181497503354,
+   "frac": 0.10390136401795795,
+   "sec_per_item": 0.6585508012457898,
+   "n_oom": 0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "qasper",
+   "subset": "span",
+   "n": 245,
+   "score": 0.44358037449963345,
+   "frac": 0.1039843543205645,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "qasper",
+   "subset": "yesno",
+   "n": 59,
+   "score": 0.6101694915254238,
+   "frac": 0.103556743269846,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "qasper",
+   "subset": "all",
+   "n": 304,
+   "score": 0.1273513792581215,
+   "frac": 0.10013450698609272,
+   "sec_per_item": 0.36089875117728587,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "qasper",
+   "subset": "span",
+   "n": 245,
+   "score": 0.10495844609987322,
+   "frac": 0.10020522240579467,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "qasper",
+   "subset": "yesno",
+   "n": 59,
+   "score": 0.22033898305084745,
+   "frac": 0.0998408582093643,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.2",
+   "task": "qasper",
+   "subset": "all",
+   "n": 304,
+   "score": 0.24268153170173165,
+   "frac": 0.20018610588900212,
+   "sec_per_item": 0.44506483485824183,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.2",
+   "task": "qasper",
+   "subset": "span",
+   "n": 245,
+   "score": 0.20316402300949557,
+   "frac": 0.2003044116034064,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.2",
+   "task": "qasper",
+   "subset": "yesno",
+   "n": 59,
+   "score": 0.4067796610169492,
+   "frac": 0.19969483639698438,
+   "sec_per_item": null,
+   "n_oom": null
+  }
+ ],
+ "longhealth": [
+  {
+   "config": "big",
+   "task": "longhealth",
+   "subset": "all",
+   "n": 80,
+   "score": 0.8,
+   "frac": 1.0,
+   "sec_per_item": 1.533473739027977,
+   "n_oom": 0
+  },
+  {
+   "config": "big",
+   "task": "longhealth",
+   "subset": "patient_01",
+   "n": 20,
+   "score": 0.8,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "big",
+   "task": "longhealth",
+   "subset": "patient_02",
+   "n": 20,
+   "score": 0.75,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "big",
+   "task": "longhealth",
+   "subset": "patient_03",
+   "n": 20,
+   "score": 0.85,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "big",
+   "task": "longhealth",
+   "subset": "patient_04",
+   "n": 20,
+   "score": 0.8,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "longhealth",
+   "subset": "all",
+   "n": 80,
+   "score": 0.825,
+   "frac": 0.1006051305991555,
+   "sec_per_item": 0.7354633212089539,
+   "n_oom": 0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "longhealth",
+   "subset": "patient_01",
+   "n": 20,
+   "score": 0.85,
+   "frac": 0.10079125540419284,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "longhealth",
+   "subset": "patient_02",
+   "n": 20,
+   "score": 0.75,
+   "frac": 0.1005404975757094,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "longhealth",
+   "subset": "patient_03",
+   "n": 20,
+   "score": 0.85,
+   "frac": 0.10054747379946817,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "longhealth",
+   "subset": "patient_04",
+   "n": 20,
+   "score": 0.85,
+   "frac": 0.10054129561725161,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "longhealth",
+   "subset": "all",
+   "n": 80,
+   "score": 0.425,
+   "frac": 0.09994012988406936,
+   "sec_per_item": 0.5212203890085221,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "longhealth",
+   "subset": "patient_01",
+   "n": 20,
+   "score": 0.4,
+   "frac": 0.09944300191806534,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "longhealth",
+   "subset": "patient_02",
+   "n": 20,
+   "score": 0.4,
+   "frac": 0.09944868093780124,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "longhealth",
+   "subset": "patient_03",
+   "n": 20,
+   "score": 0.45,
+   "frac": 0.10004966164484867,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "longhealth",
+   "subset": "patient_04",
+   "n": 20,
+   "score": 0.45,
+   "frac": 0.10081917503556216,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.2",
+   "task": "longhealth",
+   "subset": "all",
+   "n": 80,
+   "score": 0.5625,
+   "frac": 0.20001864005500383,
+   "sec_per_item": 0.6362149864435196,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.2",
+   "task": "longhealth",
+   "subset": "patient_01",
+   "n": 20,
+   "score": 0.5,
+   "frac": 0.19996512441621206,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.2",
+   "task": "longhealth",
+   "subset": "patient_02",
+   "n": 20,
+   "score": 0.65,
+   "frac": 0.2000135765075846,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.2",
+   "task": "longhealth",
+   "subset": "patient_03",
+   "n": 20,
+   "score": 0.5,
+   "frac": 0.19976667622090905,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.2",
+   "task": "longhealth",
+   "subset": "patient_04",
+   "n": 20,
+   "score": 0.6,
+   "frac": 0.20032918307530959,
+   "sec_per_item": null,
+   "n_oom": null
+  }
+ ],
+ "contractnli": [
+  {
+   "config": "big",
+   "task": "contractnli",
+   "subset": "all",
+   "n": 300,
+   "score": 0.7066666666666667,
+   "frac": 1.0,
+   "sec_per_item": 0.23720411698023477,
+   "n_oom": 0
+  },
+  {
+   "config": "big",
+   "task": "contractnli",
+   "subset": "contradiction",
+   "n": 30,
+   "score": 0.26666666666666666,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "big",
+   "task": "contractnli",
+   "subset": "entailment",
+   "n": 138,
+   "score": 0.8043478260869565,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "big",
+   "task": "contractnli",
+   "subset": "neutral",
+   "n": 132,
+   "score": 0.7045454545454546,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "contractnli",
+   "subset": "all",
+   "n": 300,
+   "score": 0.6,
+   "frac": 0.11026434660591544,
+   "sec_per_item": 0.12528183857599895,
+   "n_oom": 0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "contractnli",
+   "subset": "contradiction",
+   "n": 30,
+   "score": 0.03333333333333333,
+   "frac": 0.10992541865410209,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "contractnli",
+   "subset": "entailment",
+   "n": 138,
+   "score": 0.6231884057971014,
+   "frac": 0.10965613468990552,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "contractnli",
+   "subset": "neutral",
+   "n": 132,
+   "score": 0.7045454545454546,
+   "frac": 0.11097723359806522,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "contractnli",
+   "subset": "all",
+   "n": 300,
+   "score": 0.4533333333333333,
+   "frac": 0.10072368579391174,
+   "sec_per_item": 0.20731012423833212,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "contractnli",
+   "subset": "contradiction",
+   "n": 30,
+   "score": 0.0,
+   "frac": 0.10001384418857201,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "contractnli",
+   "subset": "entailment",
+   "n": 138,
+   "score": 0.12318840579710146,
+   "frac": 0.10107074957536388,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "contractnli",
+   "subset": "neutral",
+   "n": 132,
+   "score": 0.9015151515151515,
+   "frac": 0.10052217402360715,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.2",
+   "task": "contractnli",
+   "subset": "all",
+   "n": 300,
+   "score": 0.4866666666666667,
+   "frac": 0.19965052586337473,
+   "sec_per_item": 0.22223318815231324,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.2",
+   "task": "contractnli",
+   "subset": "contradiction",
+   "n": 30,
+   "score": 0.0,
+   "frac": 0.19954857583776164,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.2",
+   "task": "contractnli",
+   "subset": "entailment",
+   "n": 138,
+   "score": 0.1956521739130435,
+   "frac": 0.2000425258861078,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.2",
+   "task": "contractnli",
+   "subset": "neutral",
+   "n": 132,
+   "score": 0.9015151515151515,
+   "frac": 0.19926387811815674,
+   "sec_per_item": null,
+   "n_oom": null
+  }
+ ]
+}

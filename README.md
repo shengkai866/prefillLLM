@@ -105,6 +105,11 @@ scripts/
   eval_multiq.py            multi-question quality and per-question latency
   eval_longbench.py         LongBench gov_report / QMSum / LCC / RepoBench-P + 32-shot GSM8K
                             (--code_chat --code_prefix '```\n' for Qwen3-32B, see the 11-02 report §2.3)
+  prepare_bench.py          long-context benchmark pools (LastingBench, MuSiQue, LooGLE, LooGLE-long, Qasper, CLIPPER,
+                            LongHealth, ContractNLI) from raw files in $PREFILL_ROOT/data/bench/raw; middle truncation
+                            to --max_len tokens
+  eval_bench.py             the suite for any config (F1 by generation, accuracy by first-token letter logits);
+                            YaRN for Qwen3 past 40k. summarize_bench.py: table of big / ours / SpecPrefill over pairs
   fit_rarecache.py, diag_rarecache.py   RaReCache fit and fit diagnostics
   analyze_qa_errors.py      QA error types (refusal / wrong span / fabricated) from generations.jsonl
   tokmap_stats.py           cross-tokenizer alignment loss on real prompts -> results/tokalign
@@ -154,9 +159,14 @@ sbatch slurm/run_llama.slurm                                      # Llama pair: 
 sbatch -J pf_xq17ll8 --export=ALL,PAIR=q17_ll8 slurm/run_cross.slurm   # Qwen3-1.7B -> Llama-3.1-8B
 sbatch -J pf_xll1q8  --export=ALL,PAIR=ll1_q8  slurm/run_cross.slurm   # Llama-3.2-1B -> Qwen3-8B
 sbatch --export=ALL,START_AT=stage2 slurm/run_llama.slurm         # restart from a step
+sbatch --export=ALL,PAIR=06 slurm/eval_bench.slurm                # long-context suite (below) for one pair; PAIR=17|ll|32|xq17ll8|xll1q8
 ```
 The "full benchmark" consists of eval_v2, main (RULER / QA / NIAH / GSM8K / code), speed, long (16k / 32k), multiq,
-LongBench and RaReCache. 8B pairs fit on one GPU (`drjieliu-l40s` or `drjieliu-h100`); the stage-2 attention loss
+LongBench and RaReCache. `slurm/eval_bench.slurm` adds the long-context suite (large model alone vs ours vs
+SpecPrefill): LastingBench, MuSiQue, LooGLE, LooGLE-long, Qasper, CLIPPER, LongHealth, ContractNLI
+(`results/bench_<pair>/`), with QuALITY from `slurm/eval_quality.slurm`; `scripts/summarize_bench.py` writes the
+cross-pair table `results/bench_summary.md`. Prompts are capped at 64k tokens (middle truncation; 16k for 32B), Qwen3
+models use static YaRN above 40k. 8B pairs fit on one GPU (`drjieliu-l40s` or `drjieliu-h100`); the stage-2 attention loss
 needs an H100. 32B training needs 2 H100s, and 32B evaluation fits on one. Run the CPU tests with
 `cd tests && python <name>.py`.
 

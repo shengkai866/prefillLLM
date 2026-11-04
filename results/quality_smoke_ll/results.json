@@ -3,35 +3,27 @@
   "gpu": "NVIDIA L40S",
   "configs": [
    "big",
-   "hyb",
-   "attn_small:0.1:sent",
-   "specprefill:0.1"
+   "ours-acc:0.03:sent",
+   "spec-each:0.1"
   ],
   "args": {
    "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/ll1to8_mix8k/projector.pt",
-   "configs": "big,hyb,attn_small:0.1:sent,specprefill:0.1",
-   "speed_configs": "big,hyb,attn_big:0.05,attn_big:0.1,attn_big:0.2,attn_small:0.05,attn_small:0.1,attn_small:0.2,random:0.1",
-   "tasks": "quality",
-   "n_ruler": 15,
-   "ruler_lengths": "4096,8192",
-   "n_qa": 50,
-   "n_gsm8k": 150,
-   "n_code": 100,
-   "speed_lengths": "4096,8192,16384,32768",
+   "configs": "big,ours-acc:0.03:sent,spec-each:0.1",
+   "speed_configs": "big,hyb,ours:0.1:sent,ours-each:0.1:sent,spec-agn:0.1,spec-agn:0.2,spec-q1:0.1,spec-each:0.1",
+   "tasks": "qa",
+   "speed_lengths": "4096,8192,16384",
    "speed_reps": 5,
-   "speed_graph": false,
-   "n_qa_long": 40,
-   "n_quality": 4,
-   "long_max": 0,
+   "speed_nq": 0,
+   "pool": "quality_multiq_smoke",
    "n_sink": 8,
    "n_tail": 64,
+   "q_max": 320,
    "out_dir": "results/quality_smoke_ll",
-   "rarecache_fit": "",
    "force": true,
-   "plot_only": false
+   "redo": ""
   },
   "proj_step": 12000,
-  "time": "2026-11-03 17:01:50"
+  "time": "2026-11-03 19:26:37"
  },
  "quality": [
   {
@@ -161,6 +153,218 @@
    "n": 3,
    "accuracy": 0.3333333333333333,
    "frac": 0.1008452924229826
+  }
+ ],
+ "qa": [
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "all",
+   "n": 15,
+   "f1": 0.8,
+   "em": 0.8,
+   "contains": 0.8,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 10,
+   "f1": 0.7,
+   "em": 0.7,
+   "contains": 0.7,
+   "frac": null
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "later",
+   "n": 13,
+   "f1": 0.7692307692307693,
+   "em": 0.7692307692307693,
+   "contains": 0.7692307692307693,
+   "frac": null
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "q1",
+   "n": 2,
+   "f1": 1.0,
+   "em": 1.0,
+   "contains": 1.0,
+   "frac": null
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "q1-1",
+   "n": 2,
+   "f1": 1.0,
+   "em": 1.0,
+   "contains": 1.0,
+   "frac": null
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "q2-5",
+   "n": 8,
+   "f1": 0.75,
+   "em": 0.75,
+   "contains": 0.75,
+   "frac": null
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "q6-10",
+   "n": 5,
+   "f1": 0.8,
+   "em": 0.8,
+   "contains": 0.8,
+   "frac": null
+  },
+  {
+   "config": "ours-acc:0.03:sent",
+   "bucket": "8k",
+   "part": "all",
+   "n": 15,
+   "f1": 0.8666666666666667,
+   "em": 0.8666666666666667,
+   "contains": 0.8666666666666667,
+   "frac": 0.0307917234861991
+  },
+  {
+   "config": "ours-acc:0.03:sent",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 10,
+   "f1": 0.8,
+   "em": 0.8,
+   "contains": 0.8,
+   "frac": null
+  },
+  {
+   "config": "ours-acc:0.03:sent",
+   "bucket": "8k",
+   "part": "later",
+   "n": 13,
+   "f1": 0.8461538461538461,
+   "em": 0.8461538461538461,
+   "contains": 0.8461538461538461,
+   "frac": null
+  },
+  {
+   "config": "ours-acc:0.03:sent",
+   "bucket": "8k",
+   "part": "q1",
+   "n": 2,
+   "f1": 1.0,
+   "em": 1.0,
+   "contains": 1.0,
+   "frac": null
+  },
+  {
+   "config": "ours-acc:0.03:sent",
+   "bucket": "8k",
+   "part": "q1-1",
+   "n": 2,
+   "f1": 1.0,
+   "em": 1.0,
+   "contains": 1.0,
+   "frac": null
+  },
+  {
+   "config": "ours-acc:0.03:sent",
+   "bucket": "8k",
+   "part": "q2-5",
+   "n": 8,
+   "f1": 0.875,
+   "em": 0.875,
+   "contains": 0.875,
+   "frac": null
+  },
+  {
+   "config": "ours-acc:0.03:sent",
+   "bucket": "8k",
+   "part": "q6-10",
+   "n": 5,
+   "f1": 0.8,
+   "em": 0.8,
+   "contains": 0.8,
+   "frac": null
+  },
+  {
+   "config": "spec-each:0.1",
+   "bucket": "8k",
+   "part": "all",
+   "n": 15,
+   "f1": 0.5333333333333333,
+   "em": 0.5333333333333333,
+   "contains": 0.5333333333333333,
+   "frac": 0.10022693753682917
+  },
+  {
+   "config": "spec-each:0.1",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 10,
+   "f1": 0.5,
+   "em": 0.5,
+   "contains": 0.5,
+   "frac": null
+  },
+  {
+   "config": "spec-each:0.1",
+   "bucket": "8k",
+   "part": "later",
+   "n": 13,
+   "f1": 0.5384615384615384,
+   "em": 0.5384615384615384,
+   "contains": 0.5384615384615384,
+   "frac": null
+  },
+  {
+   "config": "spec-each:0.1",
+   "bucket": "8k",
+   "part": "q1",
+   "n": 2,
+   "f1": 0.5,
+   "em": 0.5,
+   "contains": 0.5,
+   "frac": null
+  },
+  {
+   "config": "spec-each:0.1",
+   "bucket": "8k",
+   "part": "q1-1",
+   "n": 2,
+   "f1": 0.5,
+   "em": 0.5,
+   "contains": 0.5,
+   "frac": null
+  },
+  {
+   "config": "spec-each:0.1",
+   "bucket": "8k",
+   "part": "q2-5",
+   "n": 8,
+   "f1": 0.5,
+   "em": 0.5,
+   "contains": 0.5,
+   "frac": null
+  },
+  {
+   "config": "spec-each:0.1",
+   "bucket": "8k",
+   "part": "q6-10",
+   "n": 5,
+   "f1": 0.6,
+   "em": 0.6,
+   "contains": 0.6,
+   "frac": null
   }
  ]
 }

@@ -1,0 +1,503 @@
+{
+ "meta": {
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "configs": [
+   "big",
+   "attn_small:0.1:sent",
+   "specprefill:0.1"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/ll1to8_mix8k/projector.pt",
+   "configs": "big,attn_small:0.1:sent,specprefill:0.1",
+   "tasks": "lastingbench,musique,loogle,loogle_long,qasper,clipper,longhealth,contractnli",
+   "max_len": 65536,
+   "suffix": "_smoke",
+   "n": 0,
+   "yarn": "auto",
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/bench_smoke_ll",
+   "force": true
+  },
+  "proj_step": 12000,
+  "time": "2026-11-03 23:51:44",
+  "yarn": 3,
+  "longest_prompt": 65536,
+  "prompt_tokens": {
+   "lastingbench": 13882.5,
+   "musique": 15979.5,
+   "loogle": 24822.5,
+   "loogle_long": 53261.5,
+   "qasper": 7643,
+   "clipper": 65536,
+   "longhealth": 11900.5,
+   "contractnli": 3717.5
+  }
+ },
+ "lastingbench": [
+  {
+   "config": "big",
+   "task": "lastingbench",
+   "subset": "all",
+   "n": 2,
+   "score": 0.5,
+   "frac": 1.0,
+   "sec_per_item": 0.8048657178878784,
+   "n_oom": 0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "lastingbench",
+   "subset": "all",
+   "n": 2,
+   "score": 0.5,
+   "frac": 0.10118144286108527,
+   "sec_per_item": 0.5014469623565674,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "lastingbench",
+   "subset": "all",
+   "n": 2,
+   "score": 0.8333333333333333,
+   "frac": 0.09992003702645,
+   "sec_per_item": 0.2911771535873413,
+   "n_oom": 0
+  }
+ ],
+ "musique": [
+  {
+   "config": "big",
+   "task": "musique",
+   "subset": "all",
+   "n": 2,
+   "score": 0.0,
+   "frac": 1.0,
+   "sec_per_item": 0.7919039726257324,
+   "n_oom": 0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "musique",
+   "subset": "all",
+   "n": 2,
+   "score": 0.0,
+   "frac": 0.10020428910296753,
+   "sec_per_item": 0.5382671356201172,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "musique",
+   "subset": "all",
+   "n": 2,
+   "score": 0.0,
+   "frac": 0.09984669550675447,
+   "sec_per_item": 0.2972759008407593,
+   "n_oom": 0
+  }
+ ],
+ "loogle": [
+  {
+   "config": "big",
+   "task": "loogle",
+   "subset": "all",
+   "n": 2,
+   "score": 0.5440251572327044,
+   "frac": 1.0,
+   "sec_per_item": 2.5435584783554077,
+   "n_oom": 0
+  },
+  {
+   "config": "big",
+   "task": "loogle",
+   "subset": "cloze",
+   "n": 1,
+   "score": 0.33333333333333337,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "big",
+   "task": "loogle",
+   "subset": "qa",
+   "n": 1,
+   "score": 0.7547169811320754,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "loogle",
+   "subset": "all",
+   "n": 2,
+   "score": 0.31818181818181823,
+   "frac": 0.10041450121891815,
+   "sec_per_item": 2.0090514421463013,
+   "n_oom": 0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "loogle",
+   "subset": "cloze",
+   "n": 1,
+   "score": 0.0,
+   "frac": 0.1000028919286272,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "loogle",
+   "subset": "qa",
+   "n": 1,
+   "score": 0.6363636363636365,
+   "frac": 0.1008261105092091,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "loogle",
+   "subset": "all",
+   "n": 2,
+   "score": 0.35,
+   "frac": 0.10035403253629868,
+   "sec_per_item": 0.9065936803817749,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "loogle",
+   "subset": "cloze",
+   "n": 1,
+   "score": 0.0,
+   "frac": 0.09989943973567016,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "loogle",
+   "subset": "qa",
+   "n": 1,
+   "score": 0.7,
+   "frac": 0.10080862533692722,
+   "sec_per_item": null,
+   "n_oom": null
+  }
+ ],
+ "loogle_long": [
+  {
+   "config": "big",
+   "task": "loogle_long",
+   "subset": "all",
+   "n": 2,
+   "score": 0.4721706864564008,
+   "frac": 1.0,
+   "sec_per_item": 6.759445548057556,
+   "n_oom": 0
+  },
+  {
+   "config": "big",
+   "task": "loogle_long",
+   "subset": "qa",
+   "n": 2,
+   "score": 0.4721706864564008,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "loogle_long",
+   "subset": "all",
+   "n": 2,
+   "score": 0.43478260869565216,
+   "frac": 0.10028293106524785,
+   "sec_per_item": 5.319334387779236,
+   "n_oom": 0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "loogle_long",
+   "subset": "qa",
+   "n": 2,
+   "score": 0.43478260869565216,
+   "frac": 0.10028293106524785,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "loogle_long",
+   "subset": "all",
+   "n": 2,
+   "score": 0.2959866220735786,
+   "frac": 0.09998988552132348,
+   "sec_per_item": 1.8851228952407837,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "loogle_long",
+   "subset": "qa",
+   "n": 2,
+   "score": 0.2959866220735786,
+   "frac": 0.09998988552132348,
+   "sec_per_item": null,
+   "n_oom": null
+  }
+ ],
+ "qasper": [
+  {
+   "config": "big",
+   "task": "qasper",
+   "subset": "all",
+   "n": 2,
+   "score": 0.6688888888888889,
+   "frac": 1.0,
+   "sec_per_item": 1.0256476402282715,
+   "n_oom": 0
+  },
+  {
+   "config": "big",
+   "task": "qasper",
+   "subset": "span",
+   "n": 2,
+   "score": 0.6688888888888889,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "qasper",
+   "subset": "all",
+   "n": 2,
+   "score": 0.56,
+   "frac": 0.10125994694960212,
+   "sec_per_item": 0.6765176057815552,
+   "n_oom": 0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "qasper",
+   "subset": "span",
+   "n": 2,
+   "score": 0.56,
+   "frac": 0.10125994694960212,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "qasper",
+   "subset": "all",
+   "n": 2,
+   "score": 0.44202898550724634,
+   "frac": 0.09982984808212965,
+   "sec_per_item": 0.45065999031066895,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "qasper",
+   "subset": "span",
+   "n": 2,
+   "score": 0.44202898550724634,
+   "frac": 0.09982984808212965,
+   "sec_per_item": null,
+   "n_oom": null
+  }
+ ],
+ "clipper": [
+  {
+   "config": "big",
+   "task": "clipper",
+   "subset": "all",
+   "n": 2,
+   "score": 0.5,
+   "frac": 1.0,
+   "sec_per_item": 5.489212393760681,
+   "n_oom": 0
+  },
+  {
+   "config": "big",
+   "task": "clipper",
+   "subset": "single",
+   "n": 2,
+   "score": 0.5,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "clipper",
+   "subset": "all",
+   "n": 2,
+   "score": 0.5,
+   "frac": 0.1001634939644208,
+   "sec_per_item": 3.5769370794296265,
+   "n_oom": 0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "clipper",
+   "subset": "single",
+   "n": 2,
+   "score": 0.5,
+   "frac": 0.1001634939644208,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "clipper",
+   "subset": "all",
+   "n": 2,
+   "score": 0.5,
+   "frac": 0.10009765625,
+   "sec_per_item": 1.541290044784546,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "clipper",
+   "subset": "single",
+   "n": 2,
+   "score": 0.5,
+   "frac": 0.10009765625,
+   "sec_per_item": null,
+   "n_oom": null
+  }
+ ],
+ "longhealth": [
+  {
+   "config": "big",
+   "task": "longhealth",
+   "subset": "all",
+   "n": 2,
+   "score": 0.5,
+   "frac": 1.0,
+   "sec_per_item": 0.48559021949768066,
+   "n_oom": 0
+  },
+  {
+   "config": "big",
+   "task": "longhealth",
+   "subset": "patient_01",
+   "n": 2,
+   "score": 0.5,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "longhealth",
+   "subset": "all",
+   "n": 2,
+   "score": 0.5,
+   "frac": 0.10079789491554197,
+   "sec_per_item": 0.27954161167144775,
+   "n_oom": 0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "longhealth",
+   "subset": "patient_01",
+   "n": 2,
+   "score": 0.5,
+   "frac": 0.10079789491554197,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "longhealth",
+   "subset": "all",
+   "n": 2,
+   "score": 0.0,
+   "frac": 0.1005424600487871,
+   "sec_per_item": 0.1838221549987793,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "longhealth",
+   "subset": "patient_01",
+   "n": 2,
+   "score": 0.0,
+   "frac": 0.1005424600487871,
+   "sec_per_item": null,
+   "n_oom": null
+  }
+ ],
+ "contractnli": [
+  {
+   "config": "big",
+   "task": "contractnli",
+   "subset": "all",
+   "n": 2,
+   "score": 0.5,
+   "frac": 1.0,
+   "sec_per_item": 0.13183224201202393,
+   "n_oom": 0
+  },
+  {
+   "config": "big",
+   "task": "contractnli",
+   "subset": "entailment",
+   "n": 2,
+   "score": 0.5,
+   "frac": 1.0,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "contractnli",
+   "subset": "all",
+   "n": 2,
+   "score": 0.5,
+   "frac": 0.11128345369427156,
+   "sec_per_item": 0.08157551288604736,
+   "n_oom": 0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "contractnli",
+   "subset": "entailment",
+   "n": 2,
+   "score": 0.5,
+   "frac": 0.11128345369427156,
+   "sec_per_item": null,
+   "n_oom": null
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "contractnli",
+   "subset": "all",
+   "n": 2,
+   "score": 0.5,
+   "frac": 0.1049006213665491,
+   "sec_per_item": 0.08792781829833984,
+   "n_oom": 0
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "contractnli",
+   "subset": "entailment",
+   "n": 2,
+   "score": 0.5,
+   "frac": 0.1049006213665491,
+   "sec_per_item": null,
+   "n_oom": null
+  }
+ ]
+}

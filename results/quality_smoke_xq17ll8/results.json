@@ -1,0 +1,370 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "big",
+   "ours-acc:0.03:sent",
+   "spec-each:0.1"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/q17toll8_mix8k/projector.pt",
+   "configs": "big,ours-acc:0.03:sent,spec-each:0.1",
+   "speed_configs": "big,hyb,ours:0.1:sent,ours-each:0.1:sent,spec-agn:0.1,spec-agn:0.2,spec-q1:0.1,spec-each:0.1",
+   "tasks": "qa",
+   "speed_lengths": "4096,8192,16384",
+   "speed_reps": 5,
+   "speed_nq": 0,
+   "pool": "quality_multiq_smoke",
+   "n_sink": 8,
+   "n_tail": 64,
+   "q_max": 320,
+   "out_dir": "results/quality_smoke_xq17ll8",
+   "force": true,
+   "redo": ""
+  },
+  "proj_step": 12000,
+  "time": "2026-11-03 22:27:07"
+ },
+ "quality": [
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.75,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.6666666666666666,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "bucket": "all",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.75,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "bucket": "all",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.6666666666666666,
+   "frac": 1.0
+  },
+  {
+   "config": "hyb",
+   "bucket": "8k",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.75,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.6666666666666666,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "bucket": "all",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.75,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "bucket": "all",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.6666666666666666,
+   "frac": 0.0
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "bucket": "8k",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.75,
+   "frac": 0.10168919707494492
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.6666666666666666,
+   "frac": 0.10159886662618903
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "bucket": "all",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.75,
+   "frac": 0.10168919707494492
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "bucket": "all",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.6666666666666666,
+   "frac": 0.10159886662618903
+  },
+  {
+   "config": "specprefill:0.1",
+   "bucket": "8k",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.5,
+   "frac": 0.10077300433903162
+  },
+  {
+   "config": "specprefill:0.1",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.3333333333333333,
+   "frac": 0.1008452924229826
+  },
+  {
+   "config": "specprefill:0.1",
+   "bucket": "all",
+   "part": "all",
+   "n": 4,
+   "accuracy": 0.5,
+   "frac": 0.10077300433903162
+  },
+  {
+   "config": "specprefill:0.1",
+   "bucket": "all",
+   "part": "hard",
+   "n": 3,
+   "accuracy": 0.3333333333333333,
+   "frac": 0.1008452924229826
+  }
+ ],
+ "qa": [
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "all",
+   "n": 15,
+   "f1": 0.8,
+   "em": 0.8,
+   "contains": 0.8,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 10,
+   "f1": 0.7,
+   "em": 0.7,
+   "contains": 0.7,
+   "frac": null
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "later",
+   "n": 13,
+   "f1": 0.7692307692307693,
+   "em": 0.7692307692307693,
+   "contains": 0.7692307692307693,
+   "frac": null
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "q1",
+   "n": 2,
+   "f1": 1.0,
+   "em": 1.0,
+   "contains": 1.0,
+   "frac": null
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "q1-1",
+   "n": 2,
+   "f1": 1.0,
+   "em": 1.0,
+   "contains": 1.0,
+   "frac": null
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "q2-5",
+   "n": 8,
+   "f1": 0.75,
+   "em": 0.75,
+   "contains": 0.75,
+   "frac": null
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "q6-10",
+   "n": 5,
+   "f1": 0.8,
+   "em": 0.8,
+   "contains": 0.8,
+   "frac": null
+  },
+  {
+   "config": "ours-acc:0.03:sent",
+   "bucket": "8k",
+   "part": "all",
+   "n": 15,
+   "f1": 0.7333333333333333,
+   "em": 0.7333333333333333,
+   "contains": 0.7333333333333333,
+   "frac": 0.03069478983166172
+  },
+  {
+   "config": "ours-acc:0.03:sent",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 10,
+   "f1": 0.6,
+   "em": 0.6,
+   "contains": 0.6,
+   "frac": null
+  },
+  {
+   "config": "ours-acc:0.03:sent",
+   "bucket": "8k",
+   "part": "later",
+   "n": 13,
+   "f1": 0.6923076923076923,
+   "em": 0.6923076923076923,
+   "contains": 0.6923076923076923,
+   "frac": null
+  },
+  {
+   "config": "ours-acc:0.03:sent",
+   "bucket": "8k",
+   "part": "q1",
+   "n": 2,
+   "f1": 1.0,
+   "em": 1.0,
+   "contains": 1.0,
+   "frac": null
+  },
+  {
+   "config": "ours-acc:0.03:sent",
+   "bucket": "8k",
+   "part": "q1-1",
+   "n": 2,
+   "f1": 1.0,
+   "em": 1.0,
+   "contains": 1.0,
+   "frac": null
+  },
+  {
+   "config": "ours-acc:0.03:sent",
+   "bucket": "8k",
+   "part": "q2-5",
+   "n": 8,
+   "f1": 0.625,
+   "em": 0.625,
+   "contains": 0.625,
+   "frac": null
+  },
+  {
+   "config": "ours-acc:0.03:sent",
+   "bucket": "8k",
+   "part": "q6-10",
+   "n": 5,
+   "f1": 0.8,
+   "em": 0.8,
+   "contains": 0.8,
+   "frac": null
+  },
+  {
+   "config": "spec-each:0.1",
+   "bucket": "8k",
+   "part": "all",
+   "n": 15,
+   "f1": 0.6,
+   "em": 0.6,
+   "contains": 0.6,
+   "frac": 0.10022693753682917
+  },
+  {
+   "config": "spec-each:0.1",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 10,
+   "f1": 0.5,
+   "em": 0.5,
+   "contains": 0.5,
+   "frac": null
+  },
+  {
+   "config": "spec-each:0.1",
+   "bucket": "8k",
+   "part": "later",
+   "n": 13,
+   "f1": 0.5384615384615384,
+   "em": 0.5384615384615384,
+   "contains": 0.5384615384615384,
+   "frac": null
+  },
+  {
+   "config": "spec-each:0.1",
+   "bucket": "8k",
+   "part": "q1",
+   "n": 2,
+   "f1": 1.0,
+   "em": 1.0,
+   "contains": 1.0,
+   "frac": null
+  },
+  {
+   "config": "spec-each:0.1",
+   "bucket": "8k",
+   "part": "q1-1",
+   "n": 2,
+   "f1": 1.0,
+   "em": 1.0,
+   "contains": 1.0,
+   "frac": null
+  },
+  {
+   "config": "spec-each:0.1",
+   "bucket": "8k",
+   "part": "q2-5",
+   "n": 8,
+   "f1": 0.5,
+   "em": 0.5,
+   "contains": 0.5,
+   "frac": null
+  },
+  {
+   "config": "spec-each:0.1",
+   "bucket": "8k",
+   "part": "q6-10",
+   "n": 5,
+   "f1": 0.6,
+   "em": 0.6,
+   "contains": 0.6,
+   "frac": null
+  }
+ ]
+}
