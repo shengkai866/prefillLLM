@@ -60,11 +60,11 @@ if after smoke; then
 fi
 if after short; then
   step "short tasks ($SHORT)"
-  ev python scripts/eval_bench.py --projector $P --out_dir $OUT --max_len $MAX_LEN --tasks $SHORT --configs $CFG
+  ev python scripts/eval_bench.py --projector $P --out_dir $OUT --max_len $MAX_LEN --tasks $SHORT --configs $CFG ${FORCE:+--force}
 fi
 if after long; then
   step "long tasks ($LONG)"
-  ev python scripts/eval_bench.py --projector $P --out_dir $OUT --max_len $MAX_LEN --tasks $LONG --configs $CFG
+  ev python scripts/eval_bench.py --projector $P --out_dir $OUT --max_len $MAX_LEN --tasks $LONG --configs $CFG ${FORCE:+--force}
 fi
 step "summary over all pairs"
 python scripts/summarize_bench.py
