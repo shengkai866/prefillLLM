@@ -1,0 +1,34 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r2_mix8k/projector.pt",
+   "stage1": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/stage1/projector.pt",
+   "n_sink": 8,
+   "n_tail": 64,
+   "lengths": "512,1024,2048,4096,8192,16384,32768",
+   "sections": "check",
+   "niah_lengths": "2048,3584",
+   "n_niah": 30,
+   "out_dir": "results/verify_fold_check_eager_06",
+   "device": "cuda",
+   "n_check": 16,
+   "check_len": 2048,
+   "n_probe": 8
+  },
+  "projector_step": 12000,
+  "time": "2026-11-04 00:35:25"
+ },
+ "check": {
+  "lean_vs_hf_big_kl": 0.0,
+  "kl_ref_hybrid": 0.11471001687459648,
+  "kl_fast_hybrid": 0.11495596240274608,
+  "kl_ref_vs_fast": 0.0008396514276682865,
+  "agree_ref": 0.86962890625,
+  "agree_fast": 0.87060546875,
+  "graph_vs_eager_hybrid_maxdiff": 0.0,
+  "n": 16,
+  "prompt_len": 2048,
+  "cont_len": 256
+ }
+}

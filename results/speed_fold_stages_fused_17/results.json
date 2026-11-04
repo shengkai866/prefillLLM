@@ -1,0 +1,92 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r5_s17_normB/projector.pt",
+   "stage1": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/stage1/projector.pt",
+   "n_sink": 8,
+   "n_tail": 64,
+   "lengths": "4096,8192,16384,32768",
+   "sections": "speed",
+   "niah_lengths": "2048,3584",
+   "n_niah": 30,
+   "out_dir": "results/speed_fold_stages_fused_17",
+   "device": "cuda",
+   "n_check": 16,
+   "check_len": 2048,
+   "n_probe": 8
+  },
+  "projector_step": 12000,
+  "time": "2026-11-03 21:55:33"
+ },
+ "speed": [
+  {
+   "prompt_len": 4096,
+   "analytic_flop_ratio": 3.439760091453189,
+   "big_hf": 0.4015491809695959,
+   "hybrid_hf": 0.2639163453131914,
+   "big_lean": 0.40906105749309063,
+   "hybrid_lean": 0.16582167334854603,
+   "big_graph": 0.40620467625558376,
+   "hybrid_graph": 0.16386615484952927,
+   "stage_small_graph": 0.09757745452225208,
+   "stage_fold_graph": 0.034342313185334206,
+   "stage_tail_graph": 0.03525015898048878,
+   "speedup_hf": 1.5215017489465255,
+   "speedup_lean": 2.466873293657288,
+   "speedup_graph": 2.478880868527017
+  },
+  {
+   "prompt_len": 8192,
+   "analytic_flop_ratio": 3.420684625605538,
+   "big_hf": 0.9487396441400051,
+   "hybrid_hf": 0.5247583892196417,
+   "big_lean": 0.9360684510320425,
+   "hybrid_lean": 0.35268883034586906,
+   "big_graph": 0.9452462177723646,
+   "hybrid_graph": 0.3468209598213434,
+   "stage_small_graph": 0.24189336597919464,
+   "stage_fold_graph": 0.06790392100811005,
+   "stage_tail_graph": 0.04101458191871643,
+   "speedup_hf": 1.8079551725716247,
+   "speedup_lean": 2.654091568803226,
+   "speedup_graph": 2.7254587446482064
+  },
+  {
+   "prompt_len": 16384,
+   "analytic_flop_ratio": 3.307574282589296,
+   "big_hf": 2.134181512519717,
+   "hybrid_hf": null,
+   "errors": {
+    "hybrid_hf": "OutOfMemoryError: CUDA out of memory. Tried to allocate 4.48 GiB. GPU 0 has a total capacity of 44.39 GiB of which 2.86 GiB is free. Including non-PyTorch memory, this process has 41.52 GiB memory in use. Of the allocated memory 40.66 GiB is allocated by PyTorch, with 11.88 MiB allocated in private pools (e.g., CUDA "
+   },
+   "big_lean": 2.1593520678579807,
+   "hybrid_lean": 0.8281094487756491,
+   "big_graph": 2.1592785511165857,
+   "hybrid_graph": 0.8265392929315567,
+   "stage_small_graph": 0.6453575566411018,
+   "stage_fold_graph": 0.136325903236866,
+   "stage_tail_graph": 0.052906231954693794,
+   "speedup_lean": 2.6075684452708026,
+   "speedup_graph": 2.612433032019676
+  },
+  {
+   "prompt_len": 32768,
+   "analytic_flop_ratio": 3.1336889245867865,
+   "big_hf": 5.084503630176187,
+   "hybrid_hf": null,
+   "errors": {
+    "hybrid_hf": "OutOfMemoryError: CUDA out of memory. Tried to allocate 4.49 GiB. GPU 0 has a total capacity of 44.39 GiB of which 4.04 GiB is free. Including non-PyTorch memory, this process has 40.35 GiB memory in use. Of the allocated memory 39.42 GiB is allocated by PyTorch, with 11.88 MiB allocated in private pools (e.g., CUDA "
+   },
+   "big_lean": 5.073258815333247,
+   "hybrid_lean": 1.9798793476074934,
+   "big_graph": 5.135274713858962,
+   "hybrid_graph": 1.9801917113363743,
+   "stage_small_graph": 1.6299760043621063,
+   "stage_fold_graph": 0.27441450394690037,
+   "stage_tail_graph": 0.07633000239729881,
+   "speedup_lean": 2.562408068685511,
+   "speedup_graph": 2.5933219922394852
+  }
+ ]
+}

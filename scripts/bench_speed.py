@@ -25,7 +25,7 @@ import torch.nn.functional as F  # noqa: E402
 
 from prefill import config as C  # noqa: E402
 from prefill.data import TokenStore  # noqa: E402
-from prefill.fast import (FastBig, FastHybrid, FastQwen3, FoldedProjectorKV, Graphed, kv_to_dynamic_cache,  # noqa: E402
+from prefill.fast import (FastBig, FastHybrid, FastQwen3, FoldedProjectorKV, Graphed, build_fold, kv_to_dynamic_cache,  # noqa: E402
                           time_call)
 from prefill.kv import (greedy_decode, hidden_to_kv, hybrid_prefill, kl_teacher_student, large_hidden_states,  # noqa: E402
                         small_hidden_states, split_prompt, student_forward, teacher_forward, true_prefill)
@@ -370,7 +370,7 @@ def main():
     print(f"[load] projector {a.projector} step {ck.get('step')}", flush=True)
     t0 = time.time()
     S, L = FastQwen3(small), FastQwen3(large)
-    fold = FoldedProjectorKV(proj, L)
+    fold = build_fold(proj, L)
     print(f"[load] fast path built in {time.time()-t0:.1f}s; folded weights {fold.Wcat.numel()*2/1e9:.2f} GB", flush=True)
     ctx = dict(tok=tok, small=small, large=large, proj=proj, S=S, L=L, fold=fold, fh=FastHybrid(S, L, fold, a.n_sink, a.n_tail),
                fb=FastBig(L), dev=dev, eos=eos_ids(tok))
