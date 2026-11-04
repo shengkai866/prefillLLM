@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=pf_foldk
 #SBATCH --account=drjieliu
-#SBATCH --partition=drjieliu-l40s
+#SBATCH --partition=drjieliu-l40s,drjieliu-h100
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=48G

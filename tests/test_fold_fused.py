@@ -90,6 +90,10 @@ def check(name, Ll, Hkv, k_norm, dev, dt, variant=2, n=512, Ls=28, d_s=1024, d_l
     assert torch.isnan(k1[:, :, :s]).all() and torch.isnan(k1[:, :, s + n:]).all(), "fused wrote outside its slice"
     assert not torch.isnan(k1[sl]).any() and not torch.isnan(v1[sl]).any(), "fused left NaNs in its slice"
     a = fused.activations(hs)
+    a0 = fused.activations_eager(hs)
+    da = (a.float() - a0.float()).abs()
+    print(f"  activations fused-vs-eager: max={da.max():.2e} rel={da.mean() / a0.float().abs().mean():.2e}")
+    assert da.mean() / a0.float().abs().mean() < 5e-3
     kr, vr = reference_fp64(fused, a, cos, sin)
     for nm, e, f, r in (("K", k0[sl], k1[sl], kr), ("V", v0[sl], v1[sl], vr)):
         me, re_ = err(e, r)
@@ -137,16 +141,18 @@ def bench(lengths, reps, dev, dt, Ls=28, Ll=36, d_s=1024, d_l=4096, H=32, Hkv=8,
                 torch.cuda.synchronize()
                 ts.append((time.perf_counter() - t0) * 1e3)
             row.append(sorted(ts[2:])[len(ts[2:]) // 2])
-        ts = []
-        for i in range(reps + 2):  # activations alone (the part the kernel does not cover)
-            torch.cuda.synchronize()
-            t0 = time.perf_counter()
-            fused.activations(hs)
-            torch.cuda.synchronize()
-            ts.append((time.perf_counter() - t0) * 1e3)
-        act = sorted(ts[2:])[len(ts[2:]) // 2]
+        act = []
+        for fn in (fused.activations_eager, fused.activations):  # activations alone (the part the fold kernel does not cover)
+            ts = []
+            for i in range(reps + 2):
+                torch.cuda.synchronize()
+                t0 = time.perf_counter()
+                fn(hs)
+                torch.cuda.synchronize()
+                ts.append((time.perf_counter() - t0) * 1e3)
+            act.append(sorted(ts[2:])[len(ts[2:]) // 2])
         print(f"  n={n:6d}: eager {row[0]:7.1f} ms   fused-v1 {row[1]:7.1f} ms   fused-v2 {row[2]:7.1f} ms   speedup {row[0] / row[2]:.2f}x"
-              f"   (v2 = activations {act:.1f} + kernel {row[2] - act:.1f})", flush=True)
+              f"   (v2 = activations {act[1]:.1f} [eager act {act[0]:.1f}] + kernel {row[2] - act[1]:.1f})", flush=True)
         del hs, cos, sin, kb, vb
         torch.cuda.empty_cache()
 

@@ -220,6 +220,30 @@ def _fold_kv_kernel2(A, W, B, COS, SIN, KN, KOUT, VOUT,
         tl.store(out + HALF, x.to(VOUT.dtype.element_ty), mask=mask_m[:, None])
 
 
+def _configs_mix():
+    return [triton.Config({"BLOCK": b}, num_warps=w, num_stages=st) for b, w, st in ((128, 4, 2), (256, 4, 2), (256, 8, 2), (512, 8, 2))]
+
+
+@triton.autotune(configs=_configs_mix(), key=[])
+@triton.jit
+def _mix_silu_kernel(H1, MIX, B1, OUT, total, s_h, s_o,
+                     LS: tl.constexpr, LL: tl.constexpr, LS_PAD: tl.constexpr, LL_PAD: tl.constexpr,
+                     DMID: tl.constexpr, BLOCK: tl.constexpr):
+    """a[l, f] = silu(sum_s mix[l, s] H1[s, f] + b1[f % d_mid]) over the flat token*feature index f: every H1 element
+    is read once (the eager K=28 matmul + bias + silu are three passes over [Ll, n, d_mid])."""
+    f0 = tl.program_id(0) * BLOCK
+    rf = f0 + tl.arange(0, BLOCK)
+    rs = tl.arange(0, LS_PAD)
+    rl = tl.arange(0, LL_PAD)
+    mask_f = rf < total
+    h = tl.load(H1 + rs[:, None] * s_h + rf[None, :], mask=(rs[:, None] < LS) & mask_f[None, :], other=0.0)
+    mix = tl.load(MIX + rl[:, None] * LS + rs[None, :], mask=(rl[:, None] < LL) & (rs[None, :] < LS), other=0.0)
+    x = tl.dot(mix, h) + tl.load(B1 + (f0 % DMID) + tl.arange(0, BLOCK)).to(tl.float32)[None, :]
+    y = x * tl.sigmoid(x)
+    tl.store(OUT + rl[:, None].to(tl.int64) * s_o + rf[None, :], y.to(OUT.dtype.element_ty),
+             mask=(rl[:, None] < LL) & mask_f[None, :])
+
+
 class FusedFoldKV(FoldedProjectorKV):
     """Drop-in replacement for FoldedProjectorKV: same constructor and __call__, fused Triton epilogue.
     chunk only bounds the materialised activations a_l [Ll, chunk, d_mid] (Y is never materialised)."""
@@ -252,6 +276,7 @@ class FusedFoldKV(FoldedProjectorKV):
         """Run once on a representative length so that autotuning / compilation never happen inside a timed or
         CUDA-graph-captured call."""
         (_fold_kv_kernel if self.variant == 1 else _fold_kv_kernel2).cache.clear()  # re-tune at this length
+        _mix_silu_kernel.cache.clear()
         Ll, Ls, d_s = self.Wcat.shape[0], self.mix.shape[1], self.W1.shape[1]
         dev = self.Wcat.device
         hs = torch.randn(Ls, n, d_s, device=dev, dtype=self.dt)
@@ -261,12 +286,31 @@ class FusedFoldKV(FoldedProjectorKV):
         self(hs, cos, cos, k, v)
         torch.cuda.synchronize()
 
-    def activations(self, hs):
+    fuse_mix = True
+
+    def activations_eager(self, hs):
         """a_l = silu(W1 · mix_l(h) + b1) for all layers: [Ll, n, d_mid] (same as the eager path)."""
         hc = rms_unit(hs) if self.in_norm else hs
         H1 = F.linear(hc, self.W1)  # [Ls, n, d_mid]
         Ll, n = self.mix.shape[0], hs.shape[1]
         return F.silu(torch.matmul(self.mix, H1.reshape(H1.shape[0], -1)).view(Ll, n, -1) + self.b1)
+
+    def activations(self, hs):
+        """Same as activations_eager, with the layer mix + bias + silu in one Triton pass over H1."""
+        if not self.fuse_mix:
+            return self.activations_eager(hs)
+        hc = rms_unit(hs) if self.in_norm else hs
+        H1 = F.linear(hc, self.W1).contiguous()  # [Ls, n, d_mid]
+        Ls, n, d_mid = H1.shape
+        Ll = self.mix.shape[0]
+        a = torch.empty(Ll, n, d_mid, dtype=H1.dtype, device=H1.device)
+        total = n * d_mid
+        pad = lambda v: max(16, triton.next_power_of_2(v))
+        assert d_mid % 512 == 0
+        _mix_silu_kernel[lambda meta: (triton.cdiv(total, meta["BLOCK"]),)](
+            H1, self.mix, self.b1, a, total, H1.stride(0), a.stride(0),
+            LS=Ls, LL=Ll, LS_PAD=pad(Ls), LL_PAD=pad(Ll), DMID=d_mid)
+        return a
 
     def __call__(self, hs, cos, sin, kdst, vdst, n_layers=None):
         n = hs.shape[1]
