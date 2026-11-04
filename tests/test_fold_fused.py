@@ -15,6 +15,7 @@ import time
 import types
 
 import torch
+import torch.nn.functional as F
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from prefill.fast import FoldedProjectorKV, rms, rope  # noqa: E402
@@ -113,6 +114,19 @@ def check(name, Ll, Hkv, k_norm, dev, dt, variant=2, n=512, Ls=28, d_s=1024, d_l
     torch.cuda.empty_cache()
 
 
+def _mix_only(fused, H1):
+    import triton
+    from prefill.fold_fused import _mix_silu_kernel
+    Ls, n, d_mid = H1.shape
+    Ll = fused.mix.shape[0]
+    a = torch.empty(Ll, n, d_mid, dtype=H1.dtype, device=H1.device)
+    total = n * d_mid
+    pad = lambda v: max(16, triton.next_power_of_2(v))
+    _mix_silu_kernel[lambda meta: (triton.cdiv(total, meta["BLOCK"]),)](
+        H1, fused.mix, fused.b1, a, total, H1.stride(0), a.stride(0), LS=Ls, LL=Ll, LS_PAD=pad(Ls), LL_PAD=pad(Ll), DMID=d_mid)
+    return a
+
+
 def bench(lengths, reps, dev, dt, Ls=28, Ll=36, d_s=1024, d_l=4096, H=32, Hkv=8, D=128):
     print(f"\n=== speed on {torch.cuda.get_device_name()} (ms per call, writes [Ll,Hkv,T,D] slice; median of {reps})")
     lf = fake_large(Ll, d_l, H, Hkv, D, dev, dt)
@@ -121,7 +135,8 @@ def bench(lengths, reps, dev, dt, Ls=28, Ll=36, d_s=1024, d_l=4096, H=32, Hkv=8,
     from prefill.fold_fused import _fold_kv_kernel, _fold_kv_kernel2
     fused1 = FusedFoldKV(p, lf, variant=1)  # warm(): autotune at 4k
     fused = FusedFoldKV(p, lf, variant=2)
-    for kern in (_fold_kv_kernel, _fold_kv_kernel2):
+    from prefill.fold_fused import _mix_silu_kernel
+    for kern in (_fold_kv_kernel, _fold_kv_kernel2, _mix_silu_kernel):
         print(f"  {kern.fn.__name__} best: {kern.best_config}")
         tm = {c: (t[0] if isinstance(t, (list, tuple)) else t) for c, t in kern.configs_timings.items()}  # do_bench: [mean,..]
         for c, t in sorted(tm.items(), key=lambda x: x[1]):
@@ -153,6 +168,21 @@ def bench(lengths, reps, dev, dt, Ls=28, Ll=36, d_s=1024, d_l=4096, H=32, Hkv=8,
             act.append(sorted(ts[2:])[len(ts[2:]) // 2])
         print(f"  n={n:6d}: eager {row[0]:7.1f} ms   fused-v1 {row[1]:7.1f} ms   fused-v2 {row[2]:7.1f} ms   speedup {row[0] / row[2]:.2f}x"
               f"   (v2 = activations {act[1]:.1f} [eager act {act[0]:.1f}] + kernel {row[2] - act[1]:.1f})", flush=True)
+        # parts of the activation step
+        from prefill.projector import rms_unit
+        hc = rms_unit(hs)
+        H1 = F.linear(hc, fused.W1)
+        parts = {"rms_unit": lambda: rms_unit(hs), "W1 linear": lambda: F.linear(hc, fused.W1),
+                 "mix+silu (triton)": lambda: fused.activations.__func__(fused, hs) if False else _mix_only(fused, H1)}
+        out = []
+        for nm, fn in parts.items():
+            ts = []
+            for i in range(reps + 2):
+                torch.cuda.synchronize(); t0 = time.perf_counter(); fn(); torch.cuda.synchronize()
+                ts.append((time.perf_counter() - t0) * 1e3)
+            out.append(f"{nm} {sorted(ts[2:])[len(ts[2:]) // 2]:.1f}")
+        print(f"           activation parts (ms): " + ", ".join(out), flush=True)
+        del hc, H1
         del hs, cos, sin, kb, vb
         torch.cuda.empty_cache()
 
