@@ -18,7 +18,8 @@
 #   ll      Llama-3.2-1B -> Llama-3.1-8B      ll1to8_mix8k    results/fused_ll1to8_<step>
 #   xq17ll8 Qwen3-1.7B -> Llama-3.1-8B        q17toll8_mix8k  results/fused_q17toll8_<step>
 #   xll1q8  Llama-3.2-1B -> Qwen3-8B          ll1toq8_mix8k   results/fused_ll1toq8_<step>
-# Phase A (first ~1 h): speed_allgraph for every pair (TTFT, every method CUDA-graphed) -> the tables that the kernel changes.
+# Phase A (first ~1.5 h): speed_allgraph for every pair, fused (all methods) and PREFILL_FOLD=eager (ours only) -> TTFT of large /
+#   small / SpecPrefill / ours with and without the fused kernel, summarised by scripts/summarize_speed.py -> results/speed_summary.md.
 # Phase B, per pair: main (NIAH / RULER / QA / GSM8K / code), long (16k / 32k), multiq, LongBench + GSM8K 32-shot,
 #   RaReCache (existing fit.pt reused), QuALITY (in place: results/quality_<pair>, quality_mq_<pair>), long-context bench
 #   (in place: results/bench_<pair>, summarised by scripts/summarize_bench.py). Everything runs with --force (nothing is
@@ -70,6 +71,9 @@ run_step() {  # $1 pair, $2 step; runs in a subshell so the pair's environment d
     case $STEP in
       speed)     ev python scripts/eval_recompute.py --projector $P --out_dir ${R}_speed --tasks speed_allgraph --configs hyb \
                    --speed_configs $CFG --speed_lengths $LEN --force ;;
+      speed_eager) export PREFILL_FOLD=eager  # ours without the fused kernel (large alone again as the in-run reference)
+                 ev python scripts/eval_recompute.py --projector $P --out_dir ${R}_speed_eagerfold --tasks speed_allgraph --configs hyb \
+                   --speed_configs big,hyb,attn_small:0.1:sent,attn_small:0.2:sent --speed_lengths $LEN --force ;;
       main)      ev python scripts/eval_recompute.py --projector $P --out_dir ${R}_main --tasks niah,ruler,qa,gsm8k,code --configs $CFG --force ;;
       long)      ev python scripts/eval_recompute.py --projector $P --out_dir ${R}_long --tasks niah_long,qa_long \
                    --configs big,hyb,attn_small:0.1:sent,drop-attn_small:0.2:sent,specprefill:0.1,specprefill:0.3 --force ;;
@@ -97,7 +101,9 @@ step "phase A: TTFT with every method CUDA-graphed, all pairs"
 for p in $PAIRS; do
   [[ $started == 1 || $p == "$START_PAIR" ]] && started=1 || continue
   run $p speed
+  run $p speed_eager
 done
+python scripts/summarize_speed.py  # -> results/speed_summary.md (large / small / SpecPrefill / ours with and without the fused kernel)
 step "phase B: everything else, pair by pair"
 started=${START_PAIR:+0}; started=${started:-1}
 for p in $PAIRS; do
@@ -108,5 +114,6 @@ for p in $PAIRS; do
     run $p $s
   done
 done
+python scripts/summarize_speed.py
 step "all done${FAILED:+ — FAILED:$FAILED}"
 [ -z "$FAILED" ]
