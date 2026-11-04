@@ -1,0 +1,90 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r2_mix8k/projector.pt",
+   "stage1": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/stage1/projector.pt",
+   "n_sink": 8,
+   "n_tail": 64,
+   "lengths": "4096,8192,16384,32768",
+   "sections": "speed",
+   "niah_lengths": "2048,3584",
+   "n_niah": 30,
+   "out_dir": "results/speed_fold_stages_fused_06",
+   "device": "cuda",
+   "n_check": 16,
+   "check_len": 2048,
+   "n_probe": 8
+  },
+  "projector_step": 12000,
+  "time": "2026-11-03 21:41:16"
+ },
+ "speed": [
+  {
+   "prompt_len": 4096,
+   "analytic_flop_ratio": 6.390761705298002,
+   "big_hf": 0.40690476819872856,
+   "hybrid_hf": 0.19888436421751976,
+   "big_lean": 0.41070783138275146,
+   "hybrid_lean": 0.10833611153066158,
+   "big_graph": 0.4117851909250021,
+   "hybrid_graph": 0.10557550378143787,
+   "stage_small_graph": 0.049645550549030304,
+   "stage_fold_graph": 0.021723797544836998,
+   "stage_tail_graph": 0.03522774390876293,
+   "speedup_hf": 2.045936440502165,
+   "speedup_lean": 3.79105199162065,
+   "speedup_graph": 3.9003857540427056
+  },
+  {
+   "prompt_len": 8192,
+   "analytic_flop_ratio": 5.9863382869021775,
+   "big_hf": 0.9524071104824543,
+   "hybrid_hf": 0.38542890548706055,
+   "big_lean": 0.9484122041612864,
+   "hybrid_lean": 0.21913756802678108,
+   "big_graph": 0.9531877189874649,
+   "hybrid_graph": 0.2175141554325819,
+   "stage_small_graph": 0.13728096522390842,
+   "stage_fold_graph": 0.04271022602915764,
+   "stage_tail_graph": 0.041013408452272415,
+   "speedup_hf": 2.4710318736445367,
+   "speedup_lean": 4.3279306816318215,
+   "speedup_graph": 4.3821870677419135
+  },
+  {
+   "prompt_len": 16384,
+   "analytic_flop_ratio": 5.187309747437866,
+   "big_hf": 2.1393161546438932,
+   "hybrid_hf": 0.8733848966658115,
+   "big_lean": 2.159570036455989,
+   "hybrid_lean": 0.5468773506581783,
+   "big_graph": 2.1593653671443462,
+   "hybrid_graph": 0.5478357933461666,
+   "stage_small_graph": 0.4139234758913517,
+   "stage_fold_graph": 0.08380027674138546,
+   "stage_tail_graph": 0.05292874574661255,
+   "speedup_hf": 2.4494540297305742,
+   "speedup_lean": 3.948911092874666,
+   "speedup_graph": 3.9416288482265815
+  },
+  {
+   "prompt_len": 32768,
+   "analytic_flop_ratio": 4.313022503341618,
+   "big_hf": 5.145139193162322,
+   "hybrid_hf": null,
+   "errors": {
+    "hybrid_hf": "OutOfMemoryError: CUDA out of memory. Tried to allocate 8.98 GiB. GPU 0 has a total capacity of 44.39 GiB of which 8.59 GiB is free. Including non-PyTorch memory, this process has 35.80 GiB memory in use. Of the allocated memory 34.78 GiB is allocated by PyTorch, with 11.88 MiB allocated in private pools (e.g., CUDA "
+   },
+   "big_lean": 5.145913561806083,
+   "hybrid_lean": 1.45242590457201,
+   "big_graph": 5.101250849664211,
+   "hybrid_graph": 1.4427066203206778,
+   "stage_small_graph": 1.1948371268808842,
+   "stage_fold_graph": 0.16788762249052525,
+   "stage_tail_graph": 0.07634650729596615,
+   "speedup_lean": 3.5429783685402128,
+   "speedup_graph": 3.535889263840995
+  }
+ ]
+}
