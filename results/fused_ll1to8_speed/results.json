@@ -1,0 +1,96 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "hyb"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/ll1to8_mix8k/projector.pt",
+   "configs": "hyb",
+   "speed_configs": "big,small,hyb,attn_small:0.1:sent,attn_small:0.2:sent,drop-attn_small:0.2:sent,specprefill:0.1,specprefill:0.2,specprefill:0.3",
+   "tasks": "speed_allgraph",
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_qa": 50,
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "speed_lengths": "4096,8192,16384,32768",
+   "speed_reps": 5,
+   "speed_graph": false,
+   "n_qa_long": 40,
+   "n_quality": 0,
+   "long_max": 0,
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/fused_ll1to8_speed",
+   "rarecache_fit": "",
+   "force": true,
+   "plot_only": false
+  },
+  "proj_step": 12000,
+  "time": "2026-11-04 02:46:44"
+ },
+ "speed_allgraph": {
+  "rows": [
+   {
+    "prompt_len": 4096,
+    "big": 0.38152653723955154,
+    "small": 0.060105977579951286,
+    "hyb": 0.10965114273130894,
+    "attn_small:0.1:sent": 0.14383292011916637,
+    "attn_small:0.2:sent": 0.19067423418164253,
+    "drop-attn_small:0.2:sent": 0.15109078399837017,
+    "specprefill:0.1": 0.15837019681930542,
+    "specprefill:0.2": 0.19114364311099052,
+    "specprefill:0.3": 0.22353661619126797
+   },
+   {
+    "prompt_len": 8192,
+    "big": 0.847727794200182,
+    "small": 0.13984673470258713,
+    "hyb": 0.20980115607380867,
+    "attn_small:0.1:sent": 0.3077870476990938,
+    "attn_small:0.2:sent": 0.4146701954305172,
+    "drop-attn_small:0.2:sent": 0.30470419488847256,
+    "specprefill:0.1": 0.29300595447421074,
+    "specprefill:0.2": 0.35980673879384995,
+    "specprefill:0.3": 0.4321480840444565
+   },
+   {
+    "prompt_len": 16384,
+    "big": 1.919262696057558,
+    "small": 0.3545371536165476,
+    "hyb": 0.470179658383131,
+    "attn_small:0.1:sent": 0.7609606292098761,
+    "attn_small:0.2:sent": 1.0393990948796272,
+    "drop-attn_small:0.2:sent": 0.6862983386963606,
+    "specprefill:0.1": 0.6162201873958111,
+    "specprefill:0.2": 0.7634089961647987,
+    "specprefill:0.3": 0.9434824027121067
+   },
+   {
+    "prompt_len": 32768,
+    "big": 4.717843305319548,
+    "small": 0.8780394028872252,
+    "hyb": 1.0888680908828974,
+    "attn_small:0.1:sent": 1.9818512443453074,
+    "attn_small:0.2:sent": 2.963750956580043,
+    "drop-attn_small:0.2:sent": 1.5997898560017347,
+    "specprefill:0.1": 1.382629532366991,
+    "specprefill:0.2": 1.7455503586679697,
+    "specprefill:0.3": 2.1543594133108854
+   }
+  ],
+  "check": {
+   "big": 0.0,
+   "small": 0.0,
+   "hyb": 0.0,
+   "attn_small:0.1:sent": 0.0,
+   "attn_small:0.2:sent": 0.0,
+   "drop-attn_small:0.2:sent": 0.0,
+   "specprefill:0.1": 0.0,
+   "specprefill:0.2": 0.0,
+   "specprefill:0.3": 0.0
+  }
+ }
+}
