@@ -7,6 +7,9 @@ Phase B: prompt prefilled by the hybrid scheme (true sink | projected middle | t
          [+ lambda_attn * attention-output matching on the prompt (stage-1 auxiliary loss, true queries, projected
          middle KV vs the teacher's own KV) on random layers from the middle third onwards]. Gradients flow
          through the frozen large model into the projector only. Curriculum on prompt length.
+--rc_fracs (recompute-aware stage 2, prefill/rc_train.py): per sequence a fraction drawn from the list of middle tokens
+         (small-model attention from the tail, sentence units = inference's "ours") is recomputed by the large model
+         inside the forward, so the projector is trained only on the cells the large model does not compute.
 """
 import argparse
 import json
@@ -26,6 +29,8 @@ from prefill.kv import kl_teacher_student, split_prompt, student_forward, teache
 from prefill.losses import attention_output_loss  # noqa: E402
 from prefill.models import eos_ids, load_pair  # noqa: E402
 from prefill.projector import Projector  # noqa: E402
+from prefill.fast import FastQwen3  # noqa: E402
+from prefill.rc_train import select_middle, student_forward_rc  # noqa: E402
 from prefill.trainutil import Logger, cosine_lr, validate_hybrid  # noqa: E402
 
 
@@ -83,18 +88,27 @@ def load_val_set(name, per_type, max_prompt):
 
 
 @torch.no_grad()
-def validate_fixed(large, small, projector, val, n_sink, n_tail, device):
-    """KL(8B || hybrid) on the 8B's own held-out responses, per data type and overall."""
+def validate_fixed(large, small, projector, val, n_sink, n_tail, device, rc=None):
+    """KL(8B || hybrid) on the 8B's own held-out responses, per data type and overall.
+    rc = (L, S, boundary, frac): also KL with `frac` of the middle recomputed (val_kl_rc<frac*100>)."""
     projector.eval()
-    per = {}
+    per, per_rc = {}, {}
     for typ, ids, P in val:
         ids = ids.unsqueeze(0).to(device)
         t = teacher_forward(large, ids, P)
         s = student_forward(large, small, projector, ids, P, n_sink, n_tail)
         per.setdefault(typ, []).append(kl_teacher_student(t, s).mean().item())
+        if rc is not None:
+            s = student_forward_rc(rc[0], rc[1], projector, ids, P, n_sink, n_tail, rc[3], rc[2], ckpt=False)[0]
+            per_rc.setdefault(typ, []).append(kl_teacher_student(t, s.to(t.device)).mean().item())
     projector.train()
     out = {f"val_kl_{k}": sum(v) / len(v) for k, v in per.items()}
     out["val_kl"] = sum(out.values()) / max(1, len(out))
+    if rc is not None:
+        tag = f"val_kl_rc{round(rc[3] * 100)}"
+        r = {f"{tag}_{k}": sum(v) / len(v) for k, v in per_rc.items()}
+        out.update(r)
+        out[tag] = sum(r.values()) / max(1, len(r))
     return out
 
 
@@ -131,6 +145,10 @@ def main():
     ap.add_argument("--save_step_every", type=int, default=2000, help="also keep projector_step<N>.pt every N steps")
     ap.add_argument("--start_step", type=int, default=0, help="resume an interrupted run: --init its projector.pt, continue "
                     "LR schedule and curriculum from this step (optimizer state is not saved, so the LR re-ramps over --warmup)")
+    ap.add_argument("--rc_fracs", default="", help="recompute-aware stage 2: comma list of recompute fractions, one drawn "
+                    "per sequence (e.g. 0,0.1,0.1,0.2); empty = plain stage 2")
+    ap.add_argument("--rc_val_frac", type=float, default=0.1, help="also validate with this recompute fraction (rc runs)")
+    ap.add_argument("--rc_ckpt", type=int, default=1, help="gradient-checkpoint the large-model recompute pass per layer")
     a = ap.parse_args()
 
     torch.manual_seed(a.seed + a.start_step)
@@ -139,6 +157,13 @@ def main():
     os.makedirs(a.out_dir, exist_ok=True)
     log = Logger(os.path.join(a.out_dir, "train_log.jsonl"))
     tok, small, large = load_pair(device)
+    rc_fracs = [float(x) for x in a.rc_fracs.split(",") if x != ""]
+    rc = None
+    if rc_fracs:
+        Lf, Sf = FastQwen3(large), FastQwen3(small)
+        boundary = torch.tensor([any(ch in tok.decode([i]) for ch in ".!?\n") for i in range(len(tok))], device=device)
+        rc = (Lf, Sf, boundary, a.rc_val_frac)
+        print(f"[rc] recompute-aware stage 2: fractions {rc_fracs}, validation also at {a.rc_val_frac}", flush=True)
     sources = a.sources.split(",")
     train_text = MixedSampler(sources, "train", a.min_prompt, seed=a.seed + 7)
     val = MixedSampler(sources, "test", 768, seed=1234)
@@ -183,7 +208,26 @@ def main():
             it = items[int(ok[random.randrange(len(ok))])] if len(ok) else items[random.randrange(len(items))]
             ids = sd_get(it).unsqueeze(0).to(device)
             P = sd_plen(it)
-            if a.lambda_attn > 0:
+            if rc is not None:
+                frac = random.choice(rc_fracs)
+                sel = select_middle(Sf, ids[0], P, a.n_sink, a.n_tail, frac, boundary)
+                need_h = a.lambda_attn > 0
+                with torch.no_grad():
+                    if need_h:
+                        out = large(input_ids=ids, output_hidden_states=True, use_cache=False, logits_to_keep=ids.shape[1] - P + 1)
+                        t_logits = out.logits[:, :-1]
+                        Ll = len(large.model.layers)
+                        h_true = torch.stack([h[:, :P].to(device) for h in out.hidden_states[:Ll]], 0)
+                        del out
+                    else:
+                        t_logits = teacher_forward(large, ids, P)
+                s_logits, idx, h_hat = student_forward_rc(Lf, Sf, projector, ids, P, a.n_sink, a.n_tail, frac, boundary,
+                                                          ckpt=bool(a.rc_ckpt), return_hidden=True, sel=sel)
+                if not need_h:
+                    h_hat = None
+                stats["rc_frac"] = stats.get("rc_frac", 0) + frac / a.accum
+                stats["rc_n"] = stats.get("rc_n", 0) + idx.numel() / a.accum
+            elif a.lambda_attn > 0:
                 with torch.no_grad():  # teacher logits and its own residual streams in one pass
                     out = large(input_ids=ids, output_hidden_states=True, use_cache=False, logits_to_keep=ids.shape[1] - P + 1)
                 t_logits = out.logits[:, :-1]
@@ -201,6 +245,8 @@ def main():
             if h_hat is not None:
                 n_s, n_m, _ = split_prompt(P, a.n_sink, a.n_tail)
                 h_mix = torch.cat([h_true[:, :, :n_s], h_hat.to(h_true.dtype), h_true[:, :, n_s + n_m:]], 2)
+                if rc is not None and idx.numel():  # recomputed tokens are true in the cache
+                    h_mix = h_mix.index_copy(2, n_s + idx, h_true[:, :, n_s + idx])
                 layers = random.sample(range(Ll // 3, Ll), min(a.attn_layers, Ll - Ll // 3))
                 loss_a = attention_output_loss(large, h_mix, h_true, n_s, layers=layers)
                 loss = loss + a.lambda_attn * loss_a.to(loss.device)
@@ -218,7 +264,7 @@ def main():
         hours = (time.time() - t_start) / 3600
         if step % a.val_every == 0:
             if val_fixed:
-                log.log(step=step, **validate_fixed(large, small, projector, val_fixed, a.n_sink, a.n_tail, device))
+                log.log(step=step, **validate_fixed(large, small, projector, val_fixed, a.n_sink, a.n_tail, device, rc))
             else:
                 v = validate_hybrid(large, small, projector, val, a.val_seqs, 2048, 256, a.n_sink, a.n_tail, device)
                 log.log(step=step, **v)
