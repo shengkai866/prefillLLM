@@ -206,7 +206,10 @@ class FoldedProjectorKV:
             self.b1 = p.trunk[0].bias.detach().to(dev, dt)
             W2T, b2 = f64(p.trunk[2].weight).T, f64(p.trunk[2].bias)  # [d_mid, d_l], [d_l]
             d_mid = W2T.shape[0]
-            ncol = 2 * self.KV + d_mid + 1
+            # rank of [M; c]^T ([d_l, d_mid+1]) is at most min(d_l, d_mid+1): a target narrower than the projector's
+            # middle width (reverse pair, 0.6B target: d_l 1024 < 2049) gets d_l norm columns, ||A u|| = ||R u|| either way
+            r = min(self.d_l, d_mid + 1)
+            ncol = 2 * self.KV + r
             ncol_pad = (ncol + 127) // 128 * 128  # zero columns add nothing to the sum of squares
             Wc, bc = [], []
             for l, lw in enumerate(lf.layers):
@@ -217,7 +220,7 @@ class FoldedProjectorKV:
                 wv = f64(lw["wqkv"][lf.H * lf.D + self.KV:])
                 ln = f64(lw["ln1"])
                 Wk_, Wv_ = ln[:, None] * wk.T, ln[:, None] * wv.T  # [d_l, KV]
-                R = torch.linalg.qr(torch.cat([M, c[None]], 0).T, mode="r")[1]  # [d_mid+1, d_mid+1]
+                R = torch.linalg.qr(torch.cat([M, c[None]], 0).T, mode="r")[1]  # [r, d_mid+1]
                 Fm = R.T
                 W = torch.zeros(d_mid, ncol_pad, dtype=torch.float64, device=dev)
                 b = torch.zeros(ncol_pad, dtype=torch.float64, device=dev)
