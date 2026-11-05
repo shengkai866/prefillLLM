@@ -11,6 +11,6 @@ export TRITON_CACHE_DIR=$PREFILL_ROOT/triton_cache
 source /home/shengkai/miniconda3/etc/profile.d/conda.sh
 conda activate rosetta
 mkdir -p $PREFILL_ROOT
-cd /nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM
+cd /nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM-moe  # branch moe-router: its own worktree (main = prefillLLM); revert on merge
 echo "== $(date) host=$(hostname) job=$SLURM_JOB_ID partition=$SLURM_JOB_PARTITION gpus=${CUDA_VISIBLE_DEVICES:-none} fold=$PREFILL_FOLD"
 nvidia-smi --query-gpu=name,memory.total --format=csv 2>/dev/null || true
