@@ -30,14 +30,16 @@ def cosine_lr(step, total, warmup, base_lr, min_ratio=0.1):
 
 
 @torch.no_grad()
-def validate_hybrid(large, small, projector, sampler, n_seqs, prompt_len, cont_len, n_sink, n_tail, device):
-    """Mean KL(teacher||hybrid), hybrid NLL, teacher NLL and top-1 agreement on held-out continuations."""
+def validate_hybrid(large, small, projector, sampler, n_seqs, prompt_len, cont_len, n_sink, n_tail, device, teacher=None):
+    """Mean KL(teacher||hybrid), hybrid NLL, teacher NLL and top-1 agreement on held-out continuations.
+    teacher: the model the hybrid is compared with (default: large, i.e. its own full prefill)."""
+    teacher = large if teacher is None else teacher
     projector.eval()
     prompt_len = min(prompt_len, sampler.max_len() - cont_len)  # adapt to what the held-out data offers
     kls, nll_h, nll_t, agree = [], [], [], []
     for _ in range(n_seqs):
         ids = sampler.sample(prompt_len + cont_len, at_least=prompt_len + cont_len).unsqueeze(0).to(device)
-        t = teacher_forward(large, ids, prompt_len)
+        t = teacher_forward(teacher, ids, prompt_len)
         s = student_forward(large, small, projector, ids, prompt_len, n_sink, n_tail)
         tgt = ids[:, prompt_len:].to(s.device)
         kls.append(kl_teacher_student(t, s).mean().item())

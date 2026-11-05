@@ -19,6 +19,13 @@ SMALL_DIR = os.environ.get("PREFILL_SMALL_DIR", os.path.join(MODELS_DIR, "Qwen3-
 SMALL_NAME = os.path.basename(SMALL_DIR.rstrip("/")).replace("Qwen3-", "")  # "0.6B", "1.7B", ... for labels
 LARGE_DIR = os.environ.get("PREFILL_LARGE_DIR", os.path.join(MODELS_DIR, "Qwen3-8B"))
 LARGE_NAME = os.path.basename(LARGE_DIR.rstrip("/")).replace("Qwen3-", "")
+# Whose outputs the projected cache is trained and scored against: "large" (the model that decodes from the cache; the
+# default) or "small" (the model that prefills). "small" is for reverse pairs, e.g. PREFILL_SMALL_DIR=Qwen3-8B,
+# PREFILL_LARGE_DIR=Qwen3-0.6B, PREFILL_TEACHER=small: the 8B prefills, the 0.6B decodes and should answer like the 8B.
+# "small" / "large" keep their code meaning (source of hidden states / owner of the KV cache), not their size.
+TEACHER = os.environ.get("PREFILL_TEACHER", "large")
+assert TEACHER in ("large", "small"), TEACHER
+TEACHER_NAME = SMALL_NAME if TEACHER == "small" else LARGE_NAME
 # Split the large model over several GPUs for training (e.g. 32B): PREFILL_LARGE_MAXMEM="24GiB,76GiB" loads it with
 # device_map="auto" under these per-GPU caps; the small model, projector and losses stay on cuda:0.
 LARGE_MAXMEM = os.environ.get("PREFILL_LARGE_MAXMEM", "")

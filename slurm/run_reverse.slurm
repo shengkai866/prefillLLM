@@ -1,0 +1,84 @@
+#!/bin/bash
+#SBATCH --job-name=pf_rev8to06
+#SBATCH --account=drjieliu
+#SBATCH --partition=drjieliu-l40s
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=6
+#SBATCH --gres=gpu:1
+#SBATCH --mem=120G
+#SBATCH --time=3-00:00:00
+#SBATCH --output=/nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM-reverse/logs/%x-%j.out
+#SBATCH --mail-user=shengkai@umich.edu
+#SBATCH --mail-type=BEGIN,END,FAIL
+# REVERSE pair (branch reverse-prefill, worktree prefillLLM-reverse): Qwen3-8B prefills, a projector maps its hidden
+# states to Qwen3-0.6B's KV cache, Qwen3-0.6B decodes. In code terms the 8B is the "small" model (source of hidden states)
+# and the 0.6B is the "large" model (owner of the cache); PREFILL_TEACHER=small makes the 8B the stage-2 KL teacher, so
+# the 0.6B should answer like the 8B. Pure projector only: no recompute configs (the user's first look at this case).
+# Same recipe as the forward pairs: stage 1 in_norm 8000 steps (hidden-state alignment to the 0.6B's residual streams),
+# stage 2 mix8k 12000 steps on the 8B's own self-distillation answers (sd_mix4k, sd_mixlong of the Qwen data tree).
+#   smoke    : a few training steps + tiny eval runs
+#   stage1   : -> $PREFILL_ROOT/checkpoints/rev8to06_stage1
+#   stage2   : -> $PREFILL_ROOT/checkpoints/rev8to06_mix8k
+#   eval_v2  : KL vs the 8B per data type (0.6B alone and ours), KL + retrieval at every checkpoint -> results/rev8to06_v2
+#   main     : NIAH / RULER / QA / GSM8K / code, configs big (= 0.6B alone), small (= 8B alone), hyb (ours)
+#   quality  : QuALITY single question, same three configs                                   -> results/rev8to06_quality
+# Results go to this worktree's results/ (prefill.config.PROJECT_DIR). Restart: sbatch --export=ALL,START_AT=<step> ...
+set -o pipefail
+source /nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM/slurm/env.sh
+cd /nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM-reverse || exit 1
+export PREFILL_SMALL_DIR=$PREFILL_ROOT/models/Qwen3-8B PREFILL_LARGE_DIR=$PREFILL_ROOT/models/Qwen3-0.6B PREFILL_TEACHER=small
+export PREFILL_FOLD=eager  # the fused fold kernel is only validated for forward pairs; speed is not measured here
+echo "worktree $(pwd) branch $(git rev-parse --abbrev-ref HEAD) $(git rev-parse --short HEAD); source 8B -> target 0.6B, teacher 8B"
+START_AT=${START_AT:-smoke}
+run=0
+step() { echo; echo "==================== [$(date '+%F %T')] $1 ===================="; }
+should() { if [[ $run == 1 || $1 == "$START_AT" ]]; then run=1; return 0; fi; return 1; }
+CK=$PREFILL_ROOT/checkpoints
+SM=$CK/rev8to06_smoke
+S1=$CK/rev8to06_stage1
+S2=$CK/rev8to06_mix8k
+P=$S2/projector.pt
+R=results/rev8to06
+CFG=big,small,hyb
+FAILED=""
+ev() { "$@" || { FAILED="$FAILED $1:$3"; echo "!!!!!!!! FAILED: $*"; }; }  # isolated eval step
+
+if should smoke; then
+  set -e
+  step "smoke: a few GPU training steps and tiny eval runs"
+  rm -rf $SM
+  python scripts/train_stage1.py --in_norm --out_dir $SM/s1 --max_steps 6 --accum 2 --val_every 3 --val_seqs 2 --save_every 1000
+  python scripts/train_stage2.py --init $SM/s1/projector.pt --out_dir $SM/s2 --max_steps 4 --accum 2 \
+    --val_every 2 --val_per_type 1 --save_every 1000 --save_step_every 0 --sd sd_mix4k,sd_mixlong --max_prompt 8064 --curriculum_frac 0
+  Q=$SM/s2/projector.pt
+  python scripts/evaluate_v2.py --projectors rev=$Q --baselines big --tasks kl --n_kl 1 --out_dir $SM/e_v2
+  python scripts/eval_recompute.py --projector $Q --out_dir $SM/e_main --tasks niah,gsm8k,quality --configs $CFG --n_gsm8k 2 --n_quality 3
+  grep -h "KL" -A4 $SM/e_v2/summary.md | head -6 || true
+  set +e
+fi
+if should stage1; then
+  step "stage1: 8B hidden states -> 0.6B residual streams, in_norm"
+  python scripts/train_stage1.py --in_norm --out_dir $S1 --max_steps 8000 --accum 4 --lr 2e-4 --time_budget_hours 22 \
+    --resume $S1/projector.pt || exit 1
+fi
+if should stage2; then
+  step "stage2: KL to the 8B, mixed data, prompts <= 8k (mix8k recipe)"
+  python scripts/train_stage2.py --init $S1/projector.pt --max_steps 12000 --accum 4 --lr 5e-5 --warmup 100 \
+    --val_every 500 --val_per_type 2 --save_every 500 --save_step_every 2000 --time_budget_hours 40 \
+    --sd sd_mix4k,sd_mixlong --max_prompt 8064 --out_dir $S2 || exit 1
+fi
+if should eval_v2; then
+  step "eval: KL vs the 8B per data type (0.6B alone and ours); KL + retrieval at every checkpoint"
+  ev python scripts/evaluate_v2.py --projectors rev8to06=$P --baselines big --tasks kl,curve --curve_runs rev8to06=$S2 --out_dir ${R}_v2
+fi
+if should main; then
+  step "eval main: NIAH / RULER / QA / GSM8K / code (0.6B alone, 8B alone, 8B prefill -> projector -> 0.6B decode)"
+  ev python scripts/eval_recompute.py --projector $P --out_dir ${R}_main --tasks niah,ruler,qa,gsm8k,code --configs $CFG
+fi
+if should quality; then
+  step "eval QuALITY (single question)"
+  ev python scripts/eval_recompute.py --projector $P --out_dir ${R}_quality --tasks quality --configs $CFG
+fi
+step "all done${FAILED:+ — FAILED:$FAILED}"
+[ -z "$FAILED" ]

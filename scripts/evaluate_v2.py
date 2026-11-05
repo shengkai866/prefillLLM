@@ -123,6 +123,10 @@ def gsm_extract(text):
         return None
 
 
+# KL is measured against the teacher's own full prefill: "big" (default) or "small" for reverse pairs (config.TEACHER)
+TEACHER_CFG = "small" if C.TEACHER == "small" else "big"
+
+
 def mean(x):
     return statistics.mean(x) if x else float("nan")
 
@@ -141,9 +145,9 @@ def task_kl(E, cfgs, n_per_cell):
         cnt[cell] += 1
         ids = st.get(i).to(E.dev)
         P = int(pl[i])
-        t = E.cont_logits("big", ids, P)
+        t = E.cont_logits(TEACHER_CFG, ids, P)
         for c in cfgs:
-            if c == "big":
+            if c == TEACHER_CFG:
                 continue
             s = E.cont_logits(c, ids, P)
             acc[(c,) + cell]["kl"].append(kl_teacher_student(t[None], s[None]).mean().item())
@@ -263,7 +267,7 @@ def task_curve(E, runs, n_kl, n_ret):
         if m["bucket"] == "4k" and cnt[m["type"]] < n_kl:
             kl_idx.append(i)
             cnt[m["type"]] += 1
-    teacher = {i: E.cont_logits("big", st.get(i).to(E.dev), int(pl[i])).cpu() for i in kl_idx}
+    teacher = {i: E.cont_logits(TEACHER_CFG, st.get(i).to(E.dev), int(pl[i])).cpu() for i in kl_idx}
     ds = load_dataset("simonjegou/ruler", "4096", split="test")
     ret = []
     for t in ("niah_single_2", "niah_multikey_1", "niah_multivalue", "niah_single_3"):
@@ -305,7 +309,7 @@ def write_summary(res, path):
     if "kl" in res:
         types = sorted({r["type"] for r in res["kl"]})
         for b in ("4k", "8k"):
-            L += [f"## 与 {C.LARGE_NAME} 的 KL（{b} prompt，越低越好）", "", "| 配置 | " + " | ".join(types) + " | 平均 |", "|---|" + "---|" * (len(types) + 1)]
+            L += [f"## 与 {C.TEACHER_NAME} 的 KL（{b} prompt，越低越好）", "", "| 配置 | " + " | ".join(types) + " | 平均 |", "|---|" + "---|" * (len(types) + 1)]
             for c in cf:
                 v = {r["type"]: r["kl"] for r in res["kl"] if r["config"] == c and r["bucket"] == b}
                 if v:

@@ -4,7 +4,7 @@ import os
 import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
-from .config import HF_CACHE_DIR, LARGE_DIR, LARGE_MAXMEM, SMALL_DIR
+from .config import HF_CACHE_DIR, LARGE_DIR, LARGE_MAXMEM, SMALL_DIR, TEACHER
 from .projector import Projector
 from .tokalign import load_or_build, same_tokenizer
 
@@ -66,6 +66,11 @@ def new_projector(small, large, d_mid=2048, rank=256, in_norm=False):
     Ls = small.config.num_hidden_layers + 1  # embeddings + every layer output
     Ll = large.config.num_hidden_layers
     return Projector(Ls, Ll, small.config.hidden_size, large.config.hidden_size, d_mid=d_mid, rank=rank, in_norm=in_norm)
+
+
+def teacher_of(small, large):
+    """The model whose outputs the projected cache is trained / scored against (config.TEACHER)."""
+    return small if TEACHER == "small" else large
 
 
 def eos_ids(tok):

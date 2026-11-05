@@ -24,7 +24,7 @@ from prefill import config as C  # noqa: E402
 from prefill.data import MixedSampler, TokenStore, save_store  # noqa: E402
 from prefill.kv import kl_teacher_student, split_prompt, student_forward, teacher_forward  # noqa: E402
 from prefill.losses import attention_output_loss  # noqa: E402
-from prefill.models import eos_ids, load_pair  # noqa: E402
+from prefill.models import eos_ids, load_pair, teacher_of  # noqa: E402
 from prefill.projector import Projector  # noqa: E402
 from prefill.trainutil import Logger, cosine_lr, validate_hybrid  # noqa: E402
 
@@ -83,13 +83,13 @@ def load_val_set(name, per_type, max_prompt):
 
 
 @torch.no_grad()
-def validate_fixed(large, small, projector, val, n_sink, n_tail, device):
-    """KL(8B || hybrid) on the 8B's own held-out responses, per data type and overall."""
+def validate_fixed(large, small, projector, val, n_sink, n_tail, device, teacher=None):
+    """KL(teacher || hybrid) on the 8B's own held-out responses, per data type and overall (teacher: default large)."""
     projector.eval()
     per = {}
     for typ, ids, P in val:
         ids = ids.unsqueeze(0).to(device)
-        t = teacher_forward(large, ids, P)
+        t = teacher_forward(teacher if teacher is not None else large, ids, P)
         s = student_forward(large, small, projector, ids, P, n_sink, n_tail)
         per.setdefault(typ, []).append(kl_teacher_student(t, s).mean().item())
     projector.train()
@@ -139,6 +139,10 @@ def main():
     os.makedirs(a.out_dir, exist_ok=True)
     log = Logger(os.path.join(a.out_dir, "train_log.jsonl"))
     tok, small, large = load_pair(device)
+    teacher = teacher_of(small, large)  # PREFILL_TEACHER=small: reverse pair, the prefilling model is the teacher
+    print(f"[teacher] {C.TEACHER_NAME} ({C.TEACHER})")
+    if a.lambda_attn > 0 and teacher is not large:
+        raise SystemExit("--lambda_attn needs the large model as teacher (it matches the large model's own residual streams)")
     sources = a.sources.split(",")
     train_text = MixedSampler(sources, "train", a.min_prompt, seed=a.seed + 7)
     val = MixedSampler(sources, "test", 768, seed=1234)
@@ -192,7 +196,7 @@ def main():
                 del out
                 s_logits, h_hat = student_forward(large, small, projector, ids, P, a.n_sink, a.n_tail, return_hidden=True)
             else:
-                t_logits = teacher_forward(large, ids, P)
+                t_logits = teacher_forward(teacher, ids, P)
                 s_logits = student_forward(large, small, projector, ids, P, a.n_sink, a.n_tail)
                 h_hat = None
             kl = kl_teacher_student(t_logits, s_logits).mean()
@@ -218,9 +222,9 @@ def main():
         hours = (time.time() - t_start) / 3600
         if step % a.val_every == 0:
             if val_fixed:
-                log.log(step=step, **validate_fixed(large, small, projector, val_fixed, a.n_sink, a.n_tail, device))
+                log.log(step=step, **validate_fixed(large, small, projector, val_fixed, a.n_sink, a.n_tail, device, teacher))
             else:
-                v = validate_hybrid(large, small, projector, val, a.val_seqs, 2048, 256, a.n_sink, a.n_tail, device)
+                v = validate_hybrid(large, small, projector, val, a.val_seqs, 2048, 256, a.n_sink, a.n_tail, device, teacher)
                 log.log(step=step, **v)
         if step % a.save_every == 0 or step == a.max_steps or hours > a.time_budget_hours:
             projector.save(os.path.join(a.out_dir, "projector.pt"), step=step, args=vars(a))
