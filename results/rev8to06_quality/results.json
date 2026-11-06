@@ -1,0 +1,181 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "big",
+   "small",
+   "hyb"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/rev8to06_mix8k/projector.pt",
+   "configs": "big,small,hyb",
+   "speed_configs": "big,hyb,attn_big:0.05,attn_big:0.1,attn_big:0.2,attn_small:0.05,attn_small:0.1,attn_small:0.2,random:0.1",
+   "tasks": "quality",
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_qa": 50,
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "speed_lengths": "4096,8192,16384,32768",
+   "speed_reps": 5,
+   "speed_graph": false,
+   "n_qa_long": 40,
+   "n_quality": 0,
+   "long_max": 0,
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/rev8to06_quality",
+   "rarecache_fit": "",
+   "force": false,
+   "plot_only": false
+  },
+  "proj_step": 12000,
+  "time": "2026-11-06 02:43:18"
+ },
+ "quality": [
+  {
+   "config": "big",
+   "bucket": "4k",
+   "part": "all",
+   "n": 555,
+   "accuracy": 0.32432432432432434,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "bucket": "4k",
+   "part": "hard",
+   "n": 206,
+   "accuracy": 0.28640776699029125,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "all",
+   "n": 1531,
+   "accuracy": 0.2730241672109732,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 859,
+   "accuracy": 0.25844004656577413,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "bucket": "all",
+   "part": "all",
+   "n": 2086,
+   "accuracy": 0.286673058485139,
+   "frac": 1.0
+  },
+  {
+   "config": "big",
+   "bucket": "all",
+   "part": "hard",
+   "n": 1065,
+   "accuracy": 0.26384976525821596,
+   "frac": 1.0
+  },
+  {
+   "config": "small",
+   "bucket": "4k",
+   "part": "all",
+   "n": 555,
+   "accuracy": 0.8396396396396396,
+   "frac": 0.0
+  },
+  {
+   "config": "small",
+   "bucket": "4k",
+   "part": "hard",
+   "n": 206,
+   "accuracy": 0.7621359223300971,
+   "frac": 0.0
+  },
+  {
+   "config": "small",
+   "bucket": "8k",
+   "part": "all",
+   "n": 1531,
+   "accuracy": 0.7256694970607446,
+   "frac": 0.0
+  },
+  {
+   "config": "small",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 859,
+   "accuracy": 0.6670547147846333,
+   "frac": 0.0
+  },
+  {
+   "config": "small",
+   "bucket": "all",
+   "part": "all",
+   "n": 2086,
+   "accuracy": 0.7559923298178332,
+   "frac": 0.0
+  },
+  {
+   "config": "small",
+   "bucket": "all",
+   "part": "hard",
+   "n": 1065,
+   "accuracy": 0.6854460093896714,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "bucket": "4k",
+   "part": "all",
+   "n": 555,
+   "accuracy": 0.5711711711711712,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "bucket": "4k",
+   "part": "hard",
+   "n": 206,
+   "accuracy": 0.4854368932038835,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "bucket": "8k",
+   "part": "all",
+   "n": 1531,
+   "accuracy": 0.45329849771391245,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "bucket": "8k",
+   "part": "hard",
+   "n": 859,
+   "accuracy": 0.41443538998835855,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "bucket": "all",
+   "part": "all",
+   "n": 2086,
+   "accuracy": 0.48465963566634707,
+   "frac": 0.0
+  },
+  {
+   "config": "hyb",
+   "bucket": "all",
+   "part": "hard",
+   "n": 1065,
+   "accuracy": 0.428169014084507,
+   "frac": 0.0
+  }
+ ]
+}
