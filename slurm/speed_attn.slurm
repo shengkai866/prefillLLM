@@ -17,6 +17,7 @@
 #           prompts, first-token logits sdpa vs triton)
 #   sdpa    PREFILL_ATTN=sdpa (masked SDPA, the current main): projected cache + ours, large alone as the in-run
 #           reference, + breakdown
+#   (first: tests/test_attn_fused.py, the job stops if it fails)
 #   qa      (06 only) QA with ours 10 % under the kernel, to compare with results/fused_06_main
 # -> scripts/summarize_attn.py -> results/attn_speed_summary.md
 #   sbatch slurm/speed_attn.slurm      PAIRS="06 17" STEPS="speed sdpa" to restrict
@@ -34,6 +35,8 @@ FAILED=""
 ev() { "$@" || { FAILED="$FAILED $PAIR:$STEP"; echo "!!!!!!!! FAILED: $*"; }; }
 python -c "import triton, torch; print('triton', triton.__version__, 'torch', torch.__version__)"
 git log --oneline -1
+step "unit test of the kernel (tests/test_attn_fused.py); stop here if it fails"
+python tests/test_attn_fused.py --lengths $LEN --reps 5 || { echo "!!!!!!!! unit test FAILED"; exit 1; }
 
 setup_pair() {
   PAIR=$1
