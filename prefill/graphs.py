@@ -8,6 +8,8 @@ fixed size for a fixed prompt, so the later stages are captured for exactly that
   big, small, hyb             one graph for the whole prefill
   ours   (attn_small:f:sent)  g1 small prefill + tail attention scores -> eager sentence selection
   ours_max (attn_max:f:sent)  same, tail scores aggregated like SpecPrefill (recompute.attn_max_layer)
+  ours_spec[:N] (spec:f[:lahN]) g1 small prefill (hidden states + look-ahead buffer) -> look-ahead steps (LookaheadGraph)
+                              -> importance graph -> eager 32-token chunk selection in the middle -> g2 as ours
                               -> g2 projector fold + large-model recompute of sink, chosen sentences and tail
   drop   (drop-attn_small)    g1 -> eager selection -> g2 large-model prefill of the kept tokens only
   spec   (specprefill:f)      g1 small prefill into the look-ahead buffer -> look-ahead steps (LookaheadGraph)
@@ -65,6 +67,50 @@ def build(rh, kind, frac, ids):
             hs, pos = select(x)
             assert pos.shape == pos0.shape, "selection size changed; graphs are per prompt"
             return g2(hs, x, pos) if kind != "drop" else g2(x, pos)
+        return run
+
+    if kind.startswith("ours_spec"):
+        n_lah = int(kind.split(":")[1]) if ":" in kind else rh.n_lah
+        k = min(m, int(round(frac * m)))
+        lah = LookaheadGraph(S, T, n_lah)
+
+        def head(x):
+            qs = []
+            logits, hs = S.prefill(x, lah.kb, lah.vb, collect=True, last_q=qs)
+            for i, q in enumerate(qs):
+                lah.qb[i, :, :1] = q
+            return logits, hs
+        g1 = Graphed(head, ids, **nocopy)
+        imp_graphs = {}
+        eos = S.own_eos(rh.eos)
+
+        def select(x):
+            logits, hs = g1(x)
+            n = 1
+            for p in range(T, T + n_lah - 1):
+                nxt = logits.argmax(-1)
+                if int(nxt) in eos:
+                    break
+                logits = lah.step(nxt, p)
+                n += 1
+            if n not in imp_graphs:
+                imp_graphs[n] = Graphed(lambda: spec_scores(S, [lah.qb[i, :, :n] for i in range(S.n_layers)], lah.kb, T,
+                                                            rh.spec_kernel))
+            imp = imp_graphs[n]()
+            idx = choose_units(imp[s:s + m], ar(0, m) // rh.spec_chunk, k, "mean")
+            return hs, torch.cat([ar(0, s), s + idx, ar(s + m, T)])
+
+        hs0, pos0 = select(ids)
+
+        def tail(hs, x, pos):
+            kb, vb = rh.stage_fold(hs[:, s:s + m], s, T)
+            return extend_at(L, x[pos], pos, kb, vb)[0]
+        g2 = Graphed(tail, hs0, ids, pos0, **nocopy)
+
+        def run(x):
+            hs, pos = select(x)
+            assert pos.shape == pos0.shape, "selection size changed; graphs are per prompt"
+            return g2(hs, x, pos)
         return run
 
     if kind == "spec":

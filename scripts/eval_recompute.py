@@ -142,8 +142,9 @@ class Engine:
             self.rc.fp32 = "f" in o
             kb, vb, lg, n = self.rc.prefill(ids, f, n_sink=self.rh.n_sink if "s" in o else 0, n_tail=self.rh.n_tail if "s" in o else 0)
             return kb, vb, lg, n / ids.shape[0]
+        lah = isinstance(u, str) and u.startswith("lah")  # spec:<f>:lahN -> look-ahead N, SpecPrefill chunks
         kb, vb, lg, n = self.rh.prefill_sel(ids, s.removeprefix("drop-"), f, needles=self.needles(answers) if s == "oracle" else None,
-                                            seg=u, drop=s.startswith("drop-"))
+                                            seg=None if lah else u, drop=s.startswith("drop-"), n_lah=int(u[3:]) if lah else None)
         _, m, _ = split_prompt(ids.shape[0], self.rh.n_sink, self.rh.n_tail)
         return kb, vb, lg, n / max(m, 1)
 
@@ -333,6 +334,8 @@ def graph_kind(cfg):
         return {"attn_small": "ours", "attn_max": "ours_max", "drop-attn_small": "drop"}[s], f
     if s == "specprefill" and u is None:
         return "spec", f
+    if s == "spec" and (u is None or str(u).startswith("lah")):
+        return "ours_spec" + (f":{u[3:]}" if u else ""), f
     raise ValueError(f"{cfg}: no graphed version in prefill/graphs.py")
 
 

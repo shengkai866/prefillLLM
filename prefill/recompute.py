@@ -325,9 +325,10 @@ class RecomputeHybrid(FastHybrid):
         return self._lah
 
     @torch.no_grad()
-    def prefill_sel(self, ids, scorer="attn_big", frac=0.1, needles=None, seg=None, drop=False):
+    def prefill_sel(self, ids, scorer="attn_big", frac=0.1, needles=None, seg=None, drop=False, n_lah=None):
         """ids [T]. Returns (kbuf, vbuf, first-token logits, number of middle tokens recomputed). With drop=True the
-        unchosen middle tokens are dropped and kbuf/vbuf hold only sink + chosen + tail (compact)."""
+        unchosen middle tokens are dropped and kbuf/vbuf hold only sink + chosen + tail (compact).
+        n_lah: look-ahead queries of the spec scorer (last prompt token + n_lah - 1 generated tokens; default self.n_lah)."""
         assert scorer in SCORERS, scorer
         L, dev = self.L, ids.device
         T = ids.shape[0]
@@ -342,8 +343,9 @@ class RecomputeHybrid(FastHybrid):
                                              kernel=self.spec_kernel)
             hs = hs[:, s:s + m]
         elif scorer == "spec":
-            hs, score = spec_importance(self.S, ids, self.n_lah, self.eos, self.spec_kernel, collect=fill,
-                                        graph=self.lah(T, self.n_lah))
+            n_lah = n_lah or self.n_lah
+            hs, score = spec_importance(self.S, ids, n_lah, self.eos, self.spec_kernel, collect=fill,
+                                        graph=self.lah(T, n_lah))
             hs, score = (hs[:, s:s + m] if fill else None), score[s:s + m]
         elif fill:
             hs = self.stage_small(ids[:s + m])[:, s:]
