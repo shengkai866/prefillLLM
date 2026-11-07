@@ -1,0 +1,72 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "attn_small:0.1:sent"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r2_mix8k/projector.pt",
+   "configs": "attn_small:0.1:sent",
+   "speed_configs": "big,attn_small:0.1:sent,attn_max:0.1:sent,specprefill:0.1",
+   "tasks": "speed_allgraph",
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_qa": 50,
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "speed_lengths": "4096,8192,16384,32768",
+   "speed_reps": 5,
+   "speed_graph": false,
+   "n_qa_long": 40,
+   "n_attn_check": 4,
+   "n_quality": 0,
+   "long_max": 0,
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/scorer_06_speed",
+   "rarecache_fit": "",
+   "force": true,
+   "plot_only": false
+  },
+  "proj_step": 12000,
+  "time": "2026-11-06 22:31:18"
+ },
+ "speed_allgraph": {
+  "rows": [
+   {
+    "prompt_len": 4096,
+    "big": 0.40087853744626045,
+    "attn_small:0.1:sent": 0.12479173205792904,
+    "attn_max:0.1:sent": 0.12649229355156422,
+    "specprefill:0.1": 0.15689637325704098
+   },
+   {
+    "prompt_len": 8192,
+    "big": 0.9332641568034887,
+    "attn_small:0.1:sent": 0.28601809218525887,
+    "attn_max:0.1:sent": 0.28371668979525566,
+    "specprefill:0.1": 0.31131751649081707
+   },
+   {
+    "prompt_len": 16384,
+    "big": 2.105286095291376,
+    "attn_small:0.1:sent": 0.733030654489994,
+    "attn_max:0.1:sent": 0.7394676823168993,
+    "specprefill:0.1": 0.7191402688622475
+   },
+   {
+    "prompt_len": 32768,
+    "big": 5.05255089700222,
+    "attn_small:0.1:sent": 1.9954829160124063,
+    "attn_max:0.1:sent": 1.976109366863966,
+    "specprefill:0.1": 1.8075183536857367
+   }
+  ],
+  "check": {
+   "big": 0.0,
+   "attn_small:0.1:sent": 0.0,
+   "attn_max:0.1:sent": 0.0,
+   "specprefill:0.1": 0.0
+  }
+ }
+}
