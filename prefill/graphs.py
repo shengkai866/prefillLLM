@@ -7,6 +7,7 @@ fixed size for a fixed prompt, so the later stages are captured for exactly that
 
   big, small, hyb             one graph for the whole prefill
   ours   (attn_small:f:sent)  g1 small prefill + tail attention scores -> eager sentence selection
+  ours_max (attn_max:f:sent)  same, tail scores aggregated like SpecPrefill (recompute.attn_max_layer)
                               -> g2 projector fold + large-model recompute of sink, chosen sentences and tail
   drop   (drop-attn_small)    g1 -> eager selection -> g2 large-model prefill of the kept tokens only
   spec   (specprefill:f)      g1 small prefill into the look-ahead buffer -> look-ahead steps (LookaheadGraph)
@@ -41,9 +42,10 @@ def build(rh, kind, frac, ids):
         g = Graphed(rh.prefill, ids, **nocopy)
         return lambda x: g(x)[2]
 
-    if kind in ("ours", "drop"):
+    if kind in ("ours", "ours_max", "drop"):
         k = min(m, int(round(frac * m)))
-        g1 = Graphed(lambda x: small_prefill_scored(S, x, t, s, s + m), ids, **nocopy)
+        agg = "max" if kind == "ours_max" else "mean"
+        g1 = Graphed(lambda x: small_prefill_scored(S, x, t, s, s + m, agg=agg, kernel=rh.spec_kernel), ids, **nocopy)
 
         def select(x):
             hs, score = g1(x)
@@ -51,7 +53,7 @@ def build(rh, kind, frac, ids):
             return hs, torch.cat([ar(0, s), s + idx, ar(s + m, T)])
 
         hs0, pos0 = select(ids)
-        if kind == "ours":
+        if kind != "drop":
             def tail(hs, x, pos):
                 kb, vb = rh.stage_fold(hs[:, s:s + m], s, T)
                 return extend_at(L, x[pos], pos, kb, vb)[0]
@@ -62,7 +64,7 @@ def build(rh, kind, frac, ids):
         def run(x):
             hs, pos = select(x)
             assert pos.shape == pos0.shape, "selection size changed; graphs are per prompt"
-            return g2(hs, x, pos) if kind == "ours" else g2(x, pos)
+            return g2(hs, x, pos) if kind != "drop" else g2(x, pos)
         return run
 
     if kind == "spec":

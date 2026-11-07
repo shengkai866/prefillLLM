@@ -11,6 +11,10 @@ Token scorers (all training-free):
   random      uniform
   recent      the middle tokens right before the tail (equivalent to a longer tail)
   attn_small  attention mass that the small model's tail queries (question + chat template) put on each middle token
+  attn_max    the same tail queries and the same single small-model pass, aggregated like SpecPrefill (spec_scores):
+              per layer and head the probabilities are average-pooled along the prompt (spec_kernel), maxed over heads
+              and layers, then averaged over the queries; no look-ahead decoding. seg=None -> SpecPrefill's 32-token
+              chunks by mean score
   attn_big    attention mass that the large model's tail queries put on each projected middle key; costs one extra
               tail pass of the large model before the recompute pass
   oracle      positions where an answer string occurs in the prompt (diagnostic upper bound; needs the answers,
@@ -40,7 +44,7 @@ from .fast import FastHybrid, Graphed, causal_mask_for, rms
 from .fast import attn_enabled, pos_attention
 from .kv import split_prompt
 
-SCORERS = ("random", "recent", "attn_small", "attn_big", "oracle", "spec")
+SCORERS = ("random", "recent", "attn_small", "attn_max", "attn_big", "oracle", "spec")
 
 
 def attn_mass(q, k, qpos, lo, hi, scale):
@@ -56,26 +60,47 @@ def attn_mass(q, k, qpos, lo, hi, scale):
     return logits.softmax(-1)[:, :, lo:hi].mean((0, 1))
 
 
+def attn_max_layer(q, k, qpos, lo, hi, scale, kernel=13):
+    """SpecPrefill-style aggregation for one layer: q [H, n, D] RoPE'd queries at positions qpos [n], k [Hkv, T, D].
+    Causal softmax over the keys, average-pooled along the keys (kernel, stride 1, as spec_scores), max over heads,
+    keys [lo, hi) -> [n, hi-lo] fp32."""
+    Hkv, T, D = k.shape
+    H, n, _ = q.shape
+    rep = H // Hkv
+    logits = torch.matmul(q.reshape(Hkv, rep * n, D).float(), k.float().transpose(1, 2)) * scale  # head g*rep+r, query j
+    keys = torch.arange(T, device=k.device)
+    logits.masked_fill_(keys[None, None, :] > qpos.repeat(rep)[None, :, None], float("-inf"))
+    a = logits.softmax(-1).reshape(H, n, T)
+    if kernel:
+        a = F.avg_pool1d(a, kernel, 1, kernel // 2)
+    return a.amax(0)[:, lo:hi]
+
+
 @torch.no_grad()
-def small_prefill_scored(S, ids, n_q, lo, hi):
-    """Like FastQwen3.prefill(collect=True) on ids [T], plus attn_mass of the last n_q queries on keys [lo, hi),
-    averaged over layers. Returns (hidden states [L+1, T, d], score [hi-lo] fp32)."""
+def small_prefill_scored(S, ids, n_q, lo, hi, agg="mean", kernel=13):
+    """Like FastQwen3.prefill(collect=True) on ids [T], plus a score of the last n_q queries on keys [lo, hi).
+    agg='mean': attn_mass averaged over layers (attn_small). agg='max': attn_max_layer maxed over layers, then averaged
+    over the queries (attn_max, SpecPrefill's aggregation). Returns (hidden states [L+1, T, d], score [hi-lo] fp32)."""
     T = ids.shape[0]
     cos, sin = S.cos[:T], S.sin[:T]
     h = F.embedding(S.ids_in(ids, first=True), S.embed)
     hs = torch.empty(len(S.layers) + 1, T, h.shape[-1], dtype=h.dtype, device=h.device)  # in place, see FastQwen3.prefill
     hs[0] = h
-    score = torch.zeros(hi - lo, dtype=torch.float32, device=ids.device)
+    score = torch.zeros(hi - lo, dtype=torch.float32, device=ids.device) if agg == "mean" else None
     qpos = torch.arange(T - n_q, T, device=ids.device)
     for i, lw in enumerate(S.layers):
         q, k, v = S._qkv(lw, rms(h, lw["ln1"], S.eps), cos, sin)
         o = F.scaled_dot_product_attention(q[None], k.repeat_interleave(S.rep, 0)[None],
                                            v.repeat_interleave(S.rep, 0)[None], is_causal=True, scale=S.scaling)[0]
-        score += attn_mass(q[:, T - n_q:], k, qpos, lo, hi, S.scaling)
+        if agg == "mean":
+            score += attn_mass(q[:, T - n_q:], k, qpos, lo, hi, S.scaling)
+        else:
+            a = attn_max_layer(q[:, T - n_q:], k, qpos, lo, hi, S.scaling, kernel)
+            score = a if score is None else torch.maximum(score, a)
         h = S._mlp(lw, S._out(lw, h, o))
         hs[i + 1] = h
     hs[-1] = rms(h, S.norm, S.eps)
-    return hs, score / len(S.layers)
+    return hs, (score / len(S.layers) if agg == "mean" else score.mean(0))
 
 
 class LookaheadGraph:
@@ -312,8 +337,9 @@ class RecomputeHybrid(FastHybrid):
             return (*self.prefill(ids), 0)
         fill = not drop or scorer == "attn_big"  # attn_big scores the projected keys, so it needs them even when dropping
         hs = None
-        if scorer == "attn_small":
-            hs, score = small_prefill_scored(self.S, ids, t, s, s + m)
+        if scorer in ("attn_small", "attn_max"):
+            hs, score = small_prefill_scored(self.S, ids, t, s, s + m, agg="max" if scorer == "attn_max" else "mean",
+                                             kernel=self.spec_kernel)
             hs = hs[:, s:s + m]
         elif scorer == "spec":
             hs, score = spec_importance(self.S, ids, self.n_lah, self.eos, self.spec_kernel, collect=fill,
@@ -329,9 +355,9 @@ class RecomputeHybrid(FastHybrid):
             _, score = extend_at(L, ids[p0], p0, kbuf, vbuf, n_q=t, lo=s, hi=s + m)
         if k == 0 and scorer != "oracle":
             idx = ar(0, 0)
-        elif scorer == "spec" and seg is None:
+        elif scorer in ("spec", "attn_max") and seg is None:
             idx = choose_units(score, ar(0, m) // self.spec_chunk, k, "mean")
-        elif scorer in ("attn_small", "attn_big", "spec") and seg is not None:
+        elif scorer in ("attn_small", "attn_max", "attn_big", "spec") and seg is not None:
             idx = choose_units(score, segment_ids(ids[s:s + m], seg, self.boundary, self.cap), k)
         elif scorer in ("attn_small", "attn_big"):
             idx = choose(score, k, self.pool)

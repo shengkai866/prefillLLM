@@ -57,7 +57,8 @@ DEFAULT_CFGS = ["big", "hyb"] + [f"{s}:{f}" for s in ("attn_big", "attn_small") 
                ["random:0.1", "random:0.2", "recent:0.1", "recent:0.2", "oracle"]
 SPEED_CFGS = ["big", "hyb"] + [f"{s}:{f}" for s in ("attn_big", "attn_small") for f in (0.05, 0.1, 0.2)] + ["random:0.1"]
 SCORER_ZH = {"attn_big": f"{C.LARGE_NAME} 注意力", "attn_small": f"{C.SMALL_NAME} 注意力", "random": "随机", "recent": "最近（加长尾部）",
-             "oracle": "理想（答案位置）", "spec": f"SpecPrefill 打分（{C.SMALL_NAME}）"}
+             "oracle": "理想（答案位置）", "spec": f"SpecPrefill 打分（{C.SMALL_NAME}）",
+             "attn_max": f"{C.SMALL_NAME} 注意力，SpecPrefill 式汇总（不 look-ahead）"}
 
 
 def parse(cfg):
@@ -328,8 +329,8 @@ def graph_kind(cfg):
     s, f, u = parse(cfg)
     if s in ("big", "small", "hyb"):
         return s, 0.0
-    if s in ("attn_small", "drop-attn_small") and u == "sent":
-        return ("ours" if s == "attn_small" else "drop"), f
+    if s in ("attn_small", "attn_max", "drop-attn_small") and u == "sent":
+        return {"attn_small": "ours", "attn_max": "ours_max", "drop-attn_small": "drop"}[s], f
     if s == "specprefill" and u is None:
         return "spec", f
     raise ValueError(f"{cfg}: no graphed version in prefill/graphs.py")
@@ -584,7 +585,7 @@ def plot(res, out_dir):
     # one series per (scorer, selection unit); categorical slots of the validated palette in fixed order
     PAL = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
     NAME = {"attn_big": f"{C.LARGE_NAME} attention", "attn_small": f"{C.SMALL_NAME} attention", "random": "random", "recent": "recent (longer tail)",
-            "spec": "SpecPrefill scores"}
+            "spec": "SpecPrefill scores", "attn_max": f"{C.SMALL_NAME} attention, SpecPrefill aggregation"}
     NAME.update({f"drop-{k}": f"{v}, rest DROPPED" for k, v in list(NAME.items())})
     NAME["specprefill"] = "SpecPrefill (x = % of whole prompt kept)"
     NAME["rarecache"] = "RaReCache (x = % of whole prompt recomputed)"
