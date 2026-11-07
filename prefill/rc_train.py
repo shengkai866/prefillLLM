@@ -24,16 +24,44 @@ from .kv import split_prompt
 from .recompute import choose_units, segment_ids, small_prefill_scored
 
 
+def perturb_score(score, unit, k, mode, miss_frac=0.5, gen=None):
+    """Training-time imperfect selection (rcn runs). score [m] token scores, unit [m] sentence ids, k token budget.
+    exact : unchanged (= inference)
+    miss  : the highest-scoring sentences making up ~miss_frac of the budget are EXCLUDED (score -inf), the budget is
+            filled from the next ones -> the most attended sentences stay projected, as when inference misses the answer
+    random: random sentences (unit score uniform), budget filled the same way."""
+    if mode == "exact" or k == 0:
+        return score
+    nu = int(unit.max()) + 1
+    if mode == "random":
+        r = torch.rand(nu, generator=gen, device="cpu").to(score.device)
+        return r[unit]
+    if mode == "miss":
+        us = torch.zeros(nu, device=score.device).scatter_reduce(0, unit, score, "amax", include_self=False)
+        ul = torch.bincount(unit, minlength=nu)
+        order = torch.argsort(us, descending=True)
+        before = torch.cumsum(ul[order], 0) - ul[order]
+        drop = order[before < max(1, int(round(miss_frac * k)))]
+        if int(ul[drop].sum()) >= unit.numel():  # never drop everything
+            return score
+        bad = torch.zeros(nu, dtype=torch.bool, device=score.device)
+        bad[drop] = True
+        return torch.where(bad[unit], torch.full_like(score, float("-inf")), score)
+    raise ValueError(mode)
+
+
 @torch.no_grad()
-def select_middle(S, ids, P, n_sink, n_tail, frac, boundary, cap=64):
-    """ids [T]. Returns (hs_mid [Ls, m, d_s], idx [k] sorted middle indices to recompute, (s, m, t))."""
+def select_middle(S, ids, P, n_sink, n_tail, frac, boundary, cap=64, mode="exact", miss_frac=0.5):
+    """ids [T]. Returns (hs_mid [Ls, m, d_s], idx [k] sorted middle indices to recompute, (s, m, t)).
+    mode: exact / miss / random (perturb_score)."""
     s, m, t = split_prompt(P, n_sink, n_tail)
     k = min(m, int(round(frac * m)))
     if m == 0:
         return None, ids.new_zeros(0), (s, m, t)
     if k > 0:
         hs, score = small_prefill_scored(S, ids[:P], t, s, s + m)
-        idx = choose_units(score, segment_ids(ids[s:s + m], "sent", boundary, cap), k)
+        unit = segment_ids(ids[s:s + m], "sent", boundary, cap)
+        idx = choose_units(perturb_score(score, unit, k, mode, miss_frac), unit, k)
     else:
         hs = S.prefill(ids[:s + m], collect=True, logits=False)[1]
         idx = ids.new_zeros(0)

@@ -10,6 +10,9 @@ Phase B: prompt prefilled by the hybrid scheme (true sink | projected middle | t
 --rc_fracs (recompute-aware stage 2, prefill/rc_train.py): per sequence a fraction drawn from the list of middle tokens
          (small-model attention from the tail, sentence units = inference's "ours") is recomputed by the large model
          inside the forward, so the projector is trained only on the cells the large model does not compute.
+--rc_sel exact:0.5,miss:0.25,random:0.25 (rcn runs): the training selection is sometimes deliberately imperfect (top
+         sentences excluded / random sentences) so the projector does not rely on the most attended sentences always
+         being recomputed.
 """
 import argparse
 import json
@@ -148,6 +151,9 @@ def main():
     ap.add_argument("--rc_fracs", default="", help="recompute-aware stage 2: comma list of recompute fractions, one drawn "
                     "per sequence (e.g. 0,0.1,0.1,0.2); empty = plain stage 2")
     ap.add_argument("--rc_val_frac", type=float, default=0.1, help="also validate with this recompute fraction (rc runs)")
+    ap.add_argument("--rc_sel", default="exact:1", help="selection modes during rc training with weights, e.g. "
+                    "exact:0.5,miss:0.25,random:0.25 (prefill/rc_train.perturb_score); validation always uses exact")
+    ap.add_argument("--rc_miss_frac", type=float, default=0.5, help="miss mode: share of the budget whose top sentences are excluded")
     ap.add_argument("--rc_ckpt", type=int, default=1, help="gradient-checkpoint the large-model recompute pass per layer")
     a = ap.parse_args()
 
@@ -163,7 +169,10 @@ def main():
         Lf, Sf = FastQwen3(large), FastQwen3(small)
         boundary = torch.tensor([any(ch in tok.decode([i]) for ch in ".!?\n") for i in range(len(tok))], device=device)
         rc = (Lf, Sf, boundary, a.rc_val_frac)
-        print(f"[rc] recompute-aware stage 2: fractions {rc_fracs}, validation also at {a.rc_val_frac}", flush=True)
+        sel_modes = [x.split(":")[0] for x in a.rc_sel.split(",")]
+        sel_w = [float(x.split(":")[1]) for x in a.rc_sel.split(",")]
+        print(f"[rc] recompute-aware stage 2: fractions {rc_fracs}, selection {dict(zip(sel_modes, sel_w))}, "
+              f"validation also at {a.rc_val_frac}", flush=True)
     sources = a.sources.split(",")
     train_text = MixedSampler(sources, "train", a.min_prompt, seed=a.seed + 7)
     val = MixedSampler(sources, "test", 768, seed=1234)
@@ -210,7 +219,8 @@ def main():
             P = sd_plen(it)
             if rc is not None:
                 frac = random.choice(rc_fracs)
-                sel = select_middle(Sf, ids[0], P, a.n_sink, a.n_tail, frac, boundary)
+                mode = random.choices(sel_modes, sel_w)[0]
+                sel = select_middle(Sf, ids[0], P, a.n_sink, a.n_tail, frac, boundary, mode=mode, miss_frac=a.rc_miss_frac)
                 need_h = a.lambda_attn > 0
                 with torch.no_grad():
                     if need_h:
@@ -227,6 +237,8 @@ def main():
                     h_hat = None
                 stats["rc_frac"] = stats.get("rc_frac", 0) + frac / a.accum
                 stats["rc_n"] = stats.get("rc_n", 0) + idx.numel() / a.accum
+                if frac > 0:
+                    stats[f"rc_sel_{mode}"] = stats.get(f"rc_sel_{mode}", 0) + 1 / a.accum
             elif a.lambda_attn > 0:
                 with torch.no_grad():  # teacher logits and its own residual streams in one pass
                     out = large(input_ids=ids, output_hidden_states=True, use_cache=False, logits_to_keep=ids.shape[1] - P + 1)
