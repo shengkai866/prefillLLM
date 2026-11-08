@@ -1,0 +1,990 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "spec:0.1:lah2",
+   "spec:0.1:lah3",
+   "spec:0.1:lah4"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r5_s17_normB/projector.pt",
+   "configs": "spec:0.1:lah2,spec:0.1:lah3,spec:0.1:lah4",
+   "speed_configs": "big,hyb,attn_big:0.05,attn_big:0.1,attn_big:0.2,attn_small:0.05,attn_small:0.1,attn_small:0.2,random:0.1",
+   "tasks": "ruler,qa,qa_long",
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_qa": 50,
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "speed_lengths": "4096,8192,16384,32768",
+   "speed_reps": 5,
+   "speed_graph": false,
+   "n_qa_long": 40,
+   "n_attn_check": 4,
+   "n_quality": 0,
+   "long_max": 0,
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/scorer_lah_17",
+   "rarecache_fit": "",
+   "force": true,
+   "plot_only": false
+  },
+  "proj_step": 12000,
+  "time": "2026-11-08 04:04:55"
+ },
+ "ruler": [
+  {
+   "config": "spec:0.1:lah2",
+   "length": 4096,
+   "task": "cwe",
+   "n": 15,
+   "score": 0.8266666666666667
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 4096,
+   "task": "fwe",
+   "n": 15,
+   "score": 0.8666666666666667
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 4096,
+   "task": "niah_multikey_1",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 4096,
+   "task": "niah_multikey_2",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 4096,
+   "task": "niah_multikey_3",
+   "n": 15,
+   "score": 0.7333333333333333
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 4096,
+   "task": "niah_multiquery",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 4096,
+   "task": "niah_multivalue",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 4096,
+   "task": "niah_single_1",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 4096,
+   "task": "niah_single_2",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 4096,
+   "task": "niah_single_3",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 4096,
+   "task": "qa_1",
+   "n": 15,
+   "score": 0.8666666666666667
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 4096,
+   "task": "qa_2",
+   "n": 15,
+   "score": 0.5333333333333333
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 4096,
+   "task": "vt",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 4096,
+   "task": "_frac",
+   "n": 195,
+   "score": 0.10433693716251054
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 4096,
+   "task": "cwe",
+   "n": 15,
+   "score": 0.8466666666666667
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 4096,
+   "task": "fwe",
+   "n": 15,
+   "score": 0.8888888888888888
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 4096,
+   "task": "niah_multikey_1",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 4096,
+   "task": "niah_multikey_2",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 4096,
+   "task": "niah_multikey_3",
+   "n": 15,
+   "score": 0.7333333333333333
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 4096,
+   "task": "niah_multiquery",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 4096,
+   "task": "niah_multivalue",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 4096,
+   "task": "niah_single_1",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 4096,
+   "task": "niah_single_2",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 4096,
+   "task": "niah_single_3",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 4096,
+   "task": "qa_1",
+   "n": 15,
+   "score": 0.8666666666666667
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 4096,
+   "task": "qa_2",
+   "n": 15,
+   "score": 0.5333333333333333
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 4096,
+   "task": "vt",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 4096,
+   "task": "_frac",
+   "n": 195,
+   "score": 0.10428734932112987
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 4096,
+   "task": "cwe",
+   "n": 15,
+   "score": 0.8266666666666667
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 4096,
+   "task": "fwe",
+   "n": 15,
+   "score": 0.8888888888888888
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 4096,
+   "task": "niah_multikey_1",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 4096,
+   "task": "niah_multikey_2",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 4096,
+   "task": "niah_multikey_3",
+   "n": 15,
+   "score": 0.9333333333333333
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 4096,
+   "task": "niah_multiquery",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 4096,
+   "task": "niah_multivalue",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 4096,
+   "task": "niah_single_1",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 4096,
+   "task": "niah_single_2",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 4096,
+   "task": "niah_single_3",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 4096,
+   "task": "qa_1",
+   "n": 15,
+   "score": 0.8666666666666667
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 4096,
+   "task": "qa_2",
+   "n": 15,
+   "score": 0.5333333333333333
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 4096,
+   "task": "vt",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 4096,
+   "task": "_frac",
+   "n": 195,
+   "score": 0.10427422715716272
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 8192,
+   "task": "cwe",
+   "n": 15,
+   "score": 0.5866666666666667
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 8192,
+   "task": "fwe",
+   "n": 15,
+   "score": 0.8666666666666667
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 8192,
+   "task": "niah_multikey_1",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 8192,
+   "task": "niah_multikey_2",
+   "n": 15,
+   "score": 0.9333333333333333
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 8192,
+   "task": "niah_multikey_3",
+   "n": 15,
+   "score": 0.4666666666666667
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 8192,
+   "task": "niah_multiquery",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 8192,
+   "task": "niah_multivalue",
+   "n": 15,
+   "score": 0.9833333333333333
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 8192,
+   "task": "niah_single_1",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 8192,
+   "task": "niah_single_2",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 8192,
+   "task": "niah_single_3",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 8192,
+   "task": "qa_1",
+   "n": 15,
+   "score": 0.7333333333333333
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 8192,
+   "task": "qa_2",
+   "n": 15,
+   "score": 0.4666666666666667
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 8192,
+   "task": "vt",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "length": 8192,
+   "task": "_frac",
+   "n": 195,
+   "score": 0.10192273408301042
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 8192,
+   "task": "cwe",
+   "n": 15,
+   "score": 0.6133333333333333
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 8192,
+   "task": "fwe",
+   "n": 15,
+   "score": 0.8444444444444444
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 8192,
+   "task": "niah_multikey_1",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 8192,
+   "task": "niah_multikey_2",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 8192,
+   "task": "niah_multikey_3",
+   "n": 15,
+   "score": 0.3333333333333333
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 8192,
+   "task": "niah_multiquery",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 8192,
+   "task": "niah_multivalue",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 8192,
+   "task": "niah_single_1",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 8192,
+   "task": "niah_single_2",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 8192,
+   "task": "niah_single_3",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 8192,
+   "task": "qa_1",
+   "n": 15,
+   "score": 0.6666666666666666
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 8192,
+   "task": "qa_2",
+   "n": 15,
+   "score": 0.4666666666666667
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 8192,
+   "task": "vt",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "length": 8192,
+   "task": "_frac",
+   "n": 195,
+   "score": 0.10192273408301042
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 8192,
+   "task": "cwe",
+   "n": 15,
+   "score": 0.6066666666666667
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 8192,
+   "task": "fwe",
+   "n": 15,
+   "score": 0.8444444444444444
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 8192,
+   "task": "niah_multikey_1",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 8192,
+   "task": "niah_multikey_2",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 8192,
+   "task": "niah_multikey_3",
+   "n": 15,
+   "score": 0.8
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 8192,
+   "task": "niah_multiquery",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 8192,
+   "task": "niah_multivalue",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 8192,
+   "task": "niah_single_1",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 8192,
+   "task": "niah_single_2",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 8192,
+   "task": "niah_single_3",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 8192,
+   "task": "qa_1",
+   "n": 15,
+   "score": 0.6666666666666666
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 8192,
+   "task": "qa_2",
+   "n": 15,
+   "score": 0.4666666666666667
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 8192,
+   "task": "vt",
+   "n": 15,
+   "score": 1.0
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "length": 8192,
+   "task": "_frac",
+   "n": 195,
+   "score": 0.10192273408301042
+  }
+ ],
+ "qa": [
+  {
+   "config": "spec:0.1:lah2",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.10442590911523474,
+   "f1": 0.6823755171557029,
+   "em": 0.54,
+   "contains": 0.58
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.10239435912663697,
+   "f1": 0.5862539682539682,
+   "em": 0.46,
+   "contains": 0.5
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.10349626590236301,
+   "f1": 0.8885018417255259,
+   "em": 0.74,
+   "contains": 0.92
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.10200832081383031,
+   "f1": 0.7690646449805988,
+   "em": 0.54,
+   "contains": 0.8
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.10412637744873733,
+   "f1": 0.69,
+   "em": 0.66,
+   "contains": 0.72
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.10220654144144403,
+   "f1": 0.7353809523809524,
+   "em": 0.68,
+   "contains": 0.74
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.10467107612506771,
+   "f1": 0.7047546021230232,
+   "em": 0.56,
+   "contains": 0.62
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.10239435912663697,
+   "f1": 0.5729206349206349,
+   "em": 0.42,
+   "contains": 0.46
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.10358910662263772,
+   "f1": 0.8912726396881745,
+   "em": 0.78,
+   "contains": 0.9
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.10200832081383031,
+   "f1": 0.7969190511108669,
+   "em": 0.58,
+   "contains": 0.84
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.10455239969004648,
+   "f1": 0.69,
+   "em": 0.66,
+   "contains": 0.72
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.10218016641778198,
+   "f1": 0.7546666666666667,
+   "em": 0.7,
+   "contains": 0.74
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.10481618102955852,
+   "f1": 0.7159108706910564,
+   "em": 0.58,
+   "contains": 0.64
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.10239435912663697,
+   "f1": 0.5795873015873015,
+   "em": 0.44,
+   "contains": 0.48
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.10369987825673557,
+   "f1": 0.8869451543080575,
+   "em": 0.76,
+   "contains": 0.9
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.10200832081383031,
+   "f1": 0.7780301622219781,
+   "em": 0.56,
+   "contains": 0.82
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.10448706799678732,
+   "f1": 0.71,
+   "em": 0.68,
+   "contains": 0.74
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.10218016641778198,
+   "f1": 0.7495384615384615,
+   "em": 0.7,
+   "contains": 0.74
+  }
+ ],
+ "qa_long": [
+  {
+   "config": "spec:0.1:lah2",
+   "source": "hotpot",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10110797309644626,
+   "f1": 0.5908333333333333,
+   "em": 0.475,
+   "contains": 0.5
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "source": "hotpot",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.10047015401731717,
+   "f1": 0.4602777777777778,
+   "em": 0.375,
+   "contains": 0.375
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "source": "squad",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10092120115259612,
+   "f1": 0.7432801049712814,
+   "em": 0.55,
+   "contains": 0.825
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "source": "squad",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.10045147201306318,
+   "f1": 0.5416055013003747,
+   "em": 0.35,
+   "contains": 0.65
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "source": "trivia",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10115074085319216,
+   "f1": 0.8203571428571429,
+   "em": 0.75,
+   "contains": 0.9
+  },
+  {
+   "config": "spec:0.1:lah2",
+   "source": "trivia",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.100517837281592,
+   "f1": 0.769011544011544,
+   "em": 0.7,
+   "contains": 0.85
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "source": "hotpot",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10110797309644626,
+   "f1": 0.6158333333333333,
+   "em": 0.5,
+   "contains": 0.525
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "source": "hotpot",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.10047015401731717,
+   "f1": 0.44763157894736844,
+   "em": 0.375,
+   "contains": 0.375
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "source": "squad",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10092120115259612,
+   "f1": 0.7300225292137057,
+   "em": 0.55,
+   "contains": 0.825
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "source": "squad",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.10045147201306318,
+   "f1": 0.5386940602500947,
+   "em": 0.35,
+   "contains": 0.65
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "source": "trivia",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10115074085319216,
+   "f1": 0.8068390804597702,
+   "em": 0.75,
+   "contains": 0.875
+  },
+  {
+   "config": "spec:0.1:lah3",
+   "source": "trivia",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.100517837281592,
+   "f1": 0.769011544011544,
+   "em": 0.7,
+   "contains": 0.85
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "source": "hotpot",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10110797309644626,
+   "f1": 0.6158333333333333,
+   "em": 0.5,
+   "contains": 0.525
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "source": "hotpot",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.10047015401731717,
+   "f1": 0.48096491228070176,
+   "em": 0.4,
+   "contains": 0.4
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "source": "squad",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10092120115259612,
+   "f1": 0.7682169736581501,
+   "em": 0.575,
+   "contains": 0.85
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "source": "squad",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.10045147201306318,
+   "f1": 0.5261940602500947,
+   "em": 0.35,
+   "contains": 0.65
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "source": "trivia",
+   "bucket": "16k",
+   "n": 40,
+   "frac": 0.10115074085319216,
+   "f1": 0.8278571428571428,
+   "em": 0.75,
+   "contains": 0.925
+  },
+  {
+   "config": "spec:0.1:lah4",
+   "source": "trivia",
+   "bucket": "32k",
+   "n": 40,
+   "frac": 0.100517837281592,
+   "f1": 0.7894660894660894,
+   "em": 0.725,
+   "contains": 0.875
+  }
+ ]
+}

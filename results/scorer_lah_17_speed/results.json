@@ -1,0 +1,87 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "attn_small:0.1:sent"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/r5_s17_normB/projector.pt",
+   "configs": "attn_small:0.1:sent",
+   "speed_configs": "big,attn_small:0.1:sent,spec:0.1:lah2,spec:0.1:lah3,spec:0.1:lah4,spec:0.1,specprefill:0.1",
+   "tasks": "speed_allgraph",
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_qa": 50,
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "speed_lengths": "4096,8192,16384,32768",
+   "speed_reps": 5,
+   "speed_graph": false,
+   "n_qa_long": 40,
+   "n_attn_check": 4,
+   "n_quality": 0,
+   "long_max": 0,
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/scorer_lah_17_speed",
+   "rarecache_fit": "",
+   "force": true,
+   "plot_only": false
+  },
+  "proj_step": 12000,
+  "time": "2026-11-08 03:58:42"
+ },
+ "speed_allgraph": {
+  "rows": [
+   {
+    "prompt_len": 4096,
+    "big": 0.40593593940138817,
+    "attn_small:0.1:sent": 0.17864591628313065,
+    "spec:0.1:lah2": 0.1885983720421791,
+    "spec:0.1:lah3": 0.20082268118858337,
+    "spec:0.1:lah4": 0.21194439008831978,
+    "spec:0.1": 0.26008604653179646,
+    "specprefill:0.1": 0.22680361941456795
+   },
+   {
+    "prompt_len": 8192,
+    "big": 0.9444645550101995,
+    "attn_small:0.1:sent": 0.4054227713495493,
+    "spec:0.1:lah2": 0.4127774257212877,
+    "spec:0.1:lah3": 0.4291927423328161,
+    "spec:0.1:lah4": 0.4437342882156372,
+    "spec:0.1": 0.507739033550024,
+    "specprefill:0.1": 0.43976117484271526
+   },
+   {
+    "prompt_len": 16384,
+    "big": 2.1589137744158506,
+    "attn_small:0.1:sent": 0.9973350949585438,
+    "spec:0.1:lah2": 1.0034634321928024,
+    "spec:0.1:lah3": 1.0269987881183624,
+    "spec:0.1:lah4": 1.053522888571024,
+    "spec:0.1": 1.1507596168667078,
+    "specprefill:0.1": 0.9837758298963308
+   },
+   {
+    "prompt_len": 32768,
+    "big": 5.071589073166251,
+    "attn_small:0.1:sent": 2.459293443709612,
+    "spec:0.1:lah2": 2.4201599676162004,
+    "spec:0.1:lah3": 2.477283062413335,
+    "spec:0.1:lah4": 2.5165257174521685,
+    "spec:0.1": 2.6751490216702223,
+    "specprefill:0.1": 2.2540624644607306
+   }
+  ],
+  "check": {
+   "big": 0.0,
+   "attn_small:0.1:sent": 0.0,
+   "spec:0.1:lah2": 0.02976190476190476,
+   "spec:0.1:lah3": 0.0,
+   "spec:0.1:lah4": 0.0,
+   "spec:0.1": 0.0,
+   "specprefill:0.1": 0.0
+  }
+ }
+}
