@@ -28,6 +28,8 @@
 # finished speed results).
 #   sbatch slurm/rerun_fused_all.slurm
 #   sbatch --export=ALL,PAIRS="06 17" slurm/rerun_fused_all.slurm
+#   sbatch --export=ALL,PHASE_A=0,PAIRS=06,STEPS=quality_mq slurm/rerun_fused_all.slurm   # one step only (no TTFT phase);
+#     steps: main long multiq longbench rare quality quality_mq bench (quality_mq = only the multi-question part of quality)
 set -o pipefail
 source /nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM/slurm/env.sh
 export PREFILL_FOLD=fused
@@ -67,7 +69,8 @@ setup_pair() {  # sets the model dirs (in the caller's subshell), projector P, T
 }
 
 run_step() {  # $1 pair, $2 step; runs in a subshell so the pair's environment does not leak
-  ( setup_pair $1 || exit 1
+  ( FAILED=""  # only this step's failures (the inherited list was re-appended every step -> doubled each time)
+    setup_pair $1 || exit 1
     STEP=$2
     step "$PAIR / $STEP"
     case $STEP in
@@ -87,7 +90,8 @@ run_step() {  # $1 pair, $2 step; runs in a subshell so the pair's environment d
                    --speed_configs big,hyb,attn_small:0.1:sent,specprefill:0.1,specprefill:0.3,$RC --speed_graph --speed_lengths $LEN --force ;;
       quality)   ev python scripts/prepare_quality.py
                  ev python scripts/eval_recompute.py --projector $P --out_dir results/quality_$PAIR --tasks quality --configs $CFG --force
-                 ev python scripts/eval_multiq.py --projector $P --out_dir results/quality_mq_$PAIR --pool quality_multiq --tasks qa --configs $QMQ --force ;;
+                 ev python scripts/eval_multiq.py --projector $P --out_dir results/quality_mq_$PAIR --pool quality_multiq --tasks qa --configs $QMQ --q_max 320 --force ;;
+      quality_mq) ev python scripts/eval_multiq.py --projector $P --out_dir results/quality_mq_$PAIR --pool quality_multiq --tasks qa --configs $QMQ --q_max 320 --force ;;
       bench)     PAIR=$PAIR START_AT=short FORCE=1 bash slurm/eval_bench.slurm || { FAILED="$FAILED $PAIR:bench"; echo "!!!!!!!! FAILED: bench $PAIR"; } ;;
       *) echo "unknown step $STEP"; FAILED="$FAILED $PAIR:$STEP" ;;
     esac
@@ -99,6 +103,7 @@ run() {  # wrapper: collect failures reported by the subshell
 }
 
 started=${START_PAIR:+0}; started=${started:-1}
+if [[ ${PHASE_A:-1} == 1 ]]; then
 step "phase A: TTFT with every method CUDA-graphed, all pairs"
 for p in $PAIRS; do
   [[ $started == 1 || $p == "$START_PAIR" ]] && started=1 || continue
@@ -106,12 +111,13 @@ for p in $PAIRS; do
   run $p speed_eager
 done
 python scripts/summarize_speed.py  # -> results/speed_summary.md (large / small / SpecPrefill / ours with and without the fused kernel)
+fi
 step "phase B: everything else, pair by pair"
 started=${START_PAIR:+0}; started=${started:-1}
 for p in $PAIRS; do
   [[ $started == 1 || $p == "$START_PAIR" ]] && started=1 || continue
   sstarted=${START_STEP:+0}; sstarted=${sstarted:-1}
-  for s in main long multiq longbench rare quality bench; do
+  for s in ${STEPS:-main long multiq longbench rare quality bench}; do
     if [[ $sstarted == 0 ]]; then [[ $s == "$START_STEP" && $p == "$START_PAIR" ]] && sstarted=1 || continue; fi
     run $p $s
   done

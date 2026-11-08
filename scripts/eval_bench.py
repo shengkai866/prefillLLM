@@ -191,6 +191,8 @@ def main():
     yarn = (math.ceil((longest + 1024) / 32768) if longest + 1024 > 40960 else 0) if a.yarn == "auto" else float(a.yarn)
     dev = torch.device("cuda")
     tok, small, large = load_pair(dev, yarn=yarn or None)
+    # yarn_config skips models with RoPE scaling of their own (Llama 3.1: 131k natively): record what was applied
+    yarn = yarn if (getattr(large.config, "rope_scaling", None) or {}).get("rope_type") == "yarn" else 0
     E = Engine(tok, small, large, a.projector, dev, a.n_sink, a.n_tail)
     cfgs = [c for c in a.configs.split(",") if c]
     res["meta"] = {"gpu": torch.cuda.get_device_name(0), "configs": cfgs, "args": vars(a), "proj_step": E.proj_step,

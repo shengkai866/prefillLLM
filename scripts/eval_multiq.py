@@ -51,8 +51,8 @@ QBINS = ((1, 1), (2, 5), (6, 10), (11, 20))  # question index ranges (1-based) r
 
 
 def task_qa(mq, tok, cfgs, dev, log, max_new=32, pool="multiq_eval", letter_ids=None):
-    """Questions with "answers" are generated and scored by F1 / EM / contains; multiple-choice questions ("gold",
-    QuALITY) are scored from the first-token logits (prefill/mcq.py) and the accuracy fills all three keys."""
+    """Questions with "answers" are generated and scored by F1 / EM / contains; multiple-choice questions
+    (QuALITY, recognised by "options") are scored from the first-token logits (prefill/mcq.py) and the accuracy fills all three keys."""
     pool = PromptPool(pool)
     long_seq = max(len(m["questions"]) for m in pool.meta) > 5
     rows = []
@@ -63,7 +63,7 @@ def task_qa(mq, tok, cfgs, dev, log, max_new=32, pool="multiq_eval", letter_ids=
             st = mq.doc(c, torch.as_tensor(pool.ids(i), device=dev))
             for j, q in enumerate(m["questions"]):
                 q_ids = torch.as_tensor(q["ids"], device=dev)
-                if "gold" in q:
+                if "options" in q:  # multiple choice (QuALITY); NOT "gold": the SQuAD pools use it for the gold paragraph index
                     _, _, lg, frac, _ = mq.ask_prefill(st, q_ids)
                     pred = choose_letter(lg, letter_ids)
                     text = "ABCD"[pred]
@@ -216,7 +216,13 @@ def main():
     dev = torch.device("cuda")
     tok, small, large = load_pair(dev)
     E = Engine(tok, small, large, a.projector, dev, a.n_sink, a.n_tail)
-    mq = MultiQ(E.rh, large, small, E.eos, q_max=a.q_max)
+    q_max = a.q_max
+    if "qa" in a.tasks.split(","):  # room for the longest question block of the pool (QuALITY: up to ~270 tokens)
+        longest = max(len(q["ids"]) for m in PromptPool(a.pool).meta for q in m["questions"])
+        if longest > q_max:
+            print(f"[multiq] q_max {q_max} -> {longest} (longest question block of {a.pool})", flush=True)
+            q_max = longest
+    mq = MultiQ(E.rh, large, small, E.eos, q_max=q_max)
     cfgs = [c for c in a.configs.split(",") if c]
     res["meta"] = {"gpu": torch.cuda.get_device_name(0), "configs": cfgs, "args": vars(a), "proj_step": E.proj_step, "time": time.strftime("%F %T")}
     log = GenLog(os.path.join(a.out_dir, "generations.jsonl"))
