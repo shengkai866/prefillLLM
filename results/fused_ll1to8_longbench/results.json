@@ -1,0 +1,317 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "big",
+   "small",
+   "hyb",
+   "attn_small:0.1:sent",
+   "drop-attn_small:0.1:sent",
+   "specprefill:0.1",
+   "specprefill:0.3"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/ll1to8_mix8k/projector.pt",
+   "configs": "big,small,hyb,attn_small:0.1:sent,drop-attn_small:0.1:sent,specprefill:0.1,specprefill:0.3",
+   "tasks": "gov_report,qmsum,lcc,repobench-p,gsm32",
+   "n_sum": 40,
+   "n_code": 60,
+   "n_gsm": 100,
+   "max_len": 7680,
+   "min_words": 3000,
+   "min_words_code": 1500,
+   "max_gen": 400,
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/fused_ll1to8_longbench",
+   "force": true,
+   "code_chat": false,
+   "code_prefix": ""
+  },
+  "proj_step": 12000,
+  "time": "2026-11-06 10:07:53"
+ },
+ "gov_report": [
+  {
+   "config": "big",
+   "task": "gov_report",
+   "n": 40,
+   "score": 0.23308295465066747,
+   "frac": 1.0,
+   "prompt_tokens": 7168.575
+  },
+  {
+   "config": "small",
+   "task": "gov_report",
+   "n": 40,
+   "score": 0.20792321543500292,
+   "frac": 0.0,
+   "prompt_tokens": 7168.575
+  },
+  {
+   "config": "hyb",
+   "task": "gov_report",
+   "n": 40,
+   "score": 0.22695832107213126,
+   "frac": 0.0,
+   "prompt_tokens": 7168.575
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "gov_report",
+   "n": 40,
+   "score": 0.22554923285726022,
+   "frac": 0.1029035654962895,
+   "prompt_tokens": 7168.575
+  },
+  {
+   "config": "drop-attn_small:0.1:sent",
+   "task": "gov_report",
+   "n": 40,
+   "score": 0.19642403540282752,
+   "frac": 0.1029035654962895,
+   "prompt_tokens": 7168.575
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "gov_report",
+   "n": 40,
+   "score": 0.19880020503471954,
+   "frac": 0.1004171521843516,
+   "prompt_tokens": 7168.575
+  },
+  {
+   "config": "specprefill:0.3",
+   "task": "gov_report",
+   "n": 40,
+   "score": 0.20728989798883773,
+   "frac": 0.2997615548651618,
+   "prompt_tokens": 7168.575
+  }
+ ],
+ "qmsum": [
+  {
+   "config": "big",
+   "task": "qmsum",
+   "n": 40,
+   "score": 0.2186760184291933,
+   "frac": 1.0,
+   "prompt_tokens": 7561.275
+  },
+  {
+   "config": "small",
+   "task": "qmsum",
+   "n": 40,
+   "score": 0.19742089253398737,
+   "frac": 0.0,
+   "prompt_tokens": 7561.275
+  },
+  {
+   "config": "hyb",
+   "task": "qmsum",
+   "n": 40,
+   "score": 0.18956661824403961,
+   "frac": 0.0,
+   "prompt_tokens": 7561.275
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "qmsum",
+   "n": 40,
+   "score": 0.19790383098852668,
+   "frac": 0.10199243272545679,
+   "prompt_tokens": 7561.275
+  },
+  {
+   "config": "drop-attn_small:0.1:sent",
+   "task": "qmsum",
+   "n": 40,
+   "score": 0.18293236567713175,
+   "frac": 0.10199243272545679,
+   "prompt_tokens": 7561.275
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "qmsum",
+   "n": 40,
+   "score": 0.1970377088687409,
+   "frac": 0.10107198878624575,
+   "prompt_tokens": 7561.275
+  },
+  {
+   "config": "specprefill:0.3",
+   "task": "qmsum",
+   "n": 40,
+   "score": 0.20023462471479447,
+   "frac": 0.30157512616745513,
+   "prompt_tokens": 7561.275
+  }
+ ],
+ "lcc": [
+  {
+   "config": "big",
+   "task": "lcc",
+   "n": 60,
+   "score": 0.6801188463489571,
+   "frac": 1.0,
+   "prompt_tokens": 5702.15
+  },
+  {
+   "config": "small",
+   "task": "lcc",
+   "n": 60,
+   "score": 0.3285571950261671,
+   "frac": 0.0,
+   "prompt_tokens": 5702.15
+  },
+  {
+   "config": "hyb",
+   "task": "lcc",
+   "n": 60,
+   "score": 0.5523665341174173,
+   "frac": 0.0,
+   "prompt_tokens": 5702.15
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "lcc",
+   "n": 60,
+   "score": 0.6184149039511526,
+   "frac": 0.10101164184025849,
+   "prompt_tokens": 5702.15
+  },
+  {
+   "config": "drop-attn_small:0.1:sent",
+   "task": "lcc",
+   "n": 60,
+   "score": 0.5601642041755169,
+   "frac": 0.10101164184025849,
+   "prompt_tokens": 5702.15
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "lcc",
+   "n": 60,
+   "score": 0.5507935639610021,
+   "frac": 0.09963926162050146,
+   "prompt_tokens": 5702.15
+  },
+  {
+   "config": "specprefill:0.3",
+   "task": "lcc",
+   "n": 60,
+   "score": 0.5153511742102178,
+   "frac": 0.3002966727932906,
+   "prompt_tokens": 5702.15
+  }
+ ],
+ "repobench-p": [
+  {
+   "config": "big",
+   "task": "repobench-p",
+   "n": 60,
+   "score": 0.5355169884419589,
+   "frac": 1.0,
+   "prompt_tokens": 7234.783333333334
+  },
+  {
+   "config": "small",
+   "task": "repobench-p",
+   "n": 60,
+   "score": 0.44348960632926526,
+   "frac": 0.0,
+   "prompt_tokens": 7234.783333333334
+  },
+  {
+   "config": "hyb",
+   "task": "repobench-p",
+   "n": 60,
+   "score": 0.5105057553975194,
+   "frac": 0.0,
+   "prompt_tokens": 7234.783333333334
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "task": "repobench-p",
+   "n": 60,
+   "score": 0.5312967652751371,
+   "frac": 0.10071264895323635,
+   "prompt_tokens": 7234.783333333334
+  },
+  {
+   "config": "drop-attn_small:0.1:sent",
+   "task": "repobench-p",
+   "n": 60,
+   "score": 0.5109679304035928,
+   "frac": 0.10071264895323635,
+   "prompt_tokens": 7234.783333333334
+  },
+  {
+   "config": "specprefill:0.1",
+   "task": "repobench-p",
+   "n": 60,
+   "score": 0.48416405642644095,
+   "frac": 0.09960266704127294,
+   "prompt_tokens": 7234.783333333334
+  },
+  {
+   "config": "specprefill:0.3",
+   "task": "repobench-p",
+   "n": 60,
+   "score": 0.45121647901248574,
+   "frac": 0.29966443650483626,
+   "prompt_tokens": 7234.783333333334
+  }
+ ],
+ "gsm32": [
+  {
+   "config": "big",
+   "n": 100,
+   "accuracy": 0.78,
+   "format_follow": 1.0,
+   "prompt_tokens": 6325.82
+  },
+  {
+   "config": "small",
+   "n": 100,
+   "accuracy": 0.38,
+   "format_follow": 0.98,
+   "prompt_tokens": 6325.82
+  },
+  {
+   "config": "hyb",
+   "n": 100,
+   "accuracy": 0.8,
+   "format_follow": 0.88,
+   "prompt_tokens": 6325.82
+  },
+  {
+   "config": "attn_small:0.1:sent",
+   "n": 100,
+   "accuracy": 0.82,
+   "format_follow": 0.96,
+   "prompt_tokens": 6325.82
+  },
+  {
+   "config": "drop-attn_small:0.1:sent",
+   "n": 100,
+   "accuracy": 0.77,
+   "format_follow": 0.05,
+   "prompt_tokens": 6325.82
+  },
+  {
+   "config": "specprefill:0.1",
+   "n": 100,
+   "accuracy": 0.79,
+   "format_follow": 0.26,
+   "prompt_tokens": 6325.82
+  },
+  {
+   "config": "specprefill:0.3",
+   "n": 100,
+   "accuracy": 0.77,
+   "format_follow": 0.89,
+   "prompt_tokens": 6325.82
+  }
+ ]
+}

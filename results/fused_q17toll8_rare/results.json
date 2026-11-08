@@ -1,0 +1,1288 @@
+{
+ "meta": {
+  "gpu": "NVIDIA L40S",
+  "configs": [
+   "rarecache-s:0",
+   "rarecache-s:0.1",
+   "rarecache-s:0.3",
+   "rarecache-s:0.5"
+  ],
+  "args": {
+   "projector": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/q17toll8_mix8k/projector.pt",
+   "configs": "rarecache-s:0,rarecache-s:0.1,rarecache-s:0.3,rarecache-s:0.5",
+   "speed_configs": "big,hyb,attn_small:0.1:sent,specprefill:0.1,specprefill:0.3,rarecache-s:0,rarecache-s:0.1,rarecache-s:0.3,rarecache-s:0.5",
+   "tasks": "speed,niah,ruler,qa,gsm8k,code",
+   "n_ruler": 15,
+   "ruler_lengths": "4096,8192",
+   "n_qa": 50,
+   "n_gsm8k": 150,
+   "n_code": 100,
+   "speed_lengths": "4096,8192,16384,32768",
+   "speed_reps": 5,
+   "speed_graph": true,
+   "n_qa_long": 40,
+   "n_quality": 0,
+   "long_max": 0,
+   "n_sink": 8,
+   "n_tail": 64,
+   "out_dir": "results/fused_q17toll8_rare",
+   "rarecache_fit": "/scratch/drjieliu_root/drjieliu/shengkai/prefillLLM/checkpoints/rarecache_q17toll8/fit.pt",
+   "force": true,
+   "plot_only": false
+  },
+  "proj_step": 12000,
+  "time": "2026-11-07 06:57:26"
+ },
+ "speed": [
+  {
+   "prompt_len": 4096,
+   "big": 0.36551554687321186,
+   "hyb": 0.14708851464092731,
+   "attn_small:0.1:sent": 0.17840749211609364,
+   "specprefill:0.1": 0.22299934923648834,
+   "specprefill:0.3": 0.2869866658002138,
+   "rarecache-s:0": 0.1944284774363041,
+   "rarecache-s:0.1": 0.21988691203296185,
+   "rarecache-s:0.3": 0.3005432244390249,
+   "rarecache-s:0.5": 0.3765077758580446
+  },
+  {
+   "prompt_len": 8192,
+   "big": 0.8392404206097126,
+   "hyb": 0.3098052069544792,
+   "attn_small:0.1:sent": 0.40998014248907566,
+   "specprefill:0.1": 0.42676014080643654,
+   "specprefill:0.3": 0.5646165497601032,
+   "rarecache-s:0": 0.41681913286447525,
+   "rarecache-s:0.1": 0.498527429997921,
+   "rarecache-s:0.3": 0.699586546048522,
+   "rarecache-s:0.5": 0.9130760077387094
+  },
+  {
+   "prompt_len": 16384,
+   "big": 1.9193147867918015,
+   "hyb": 0.7546123918145895,
+   "attn_small:0.1:sent": 1.0387177001684904,
+   "specprefill:0.1": 0.9538640975952148,
+   "specprefill:0.3": 1.2744447402656078,
+   "rarecache-s:0": 0.9670104812830687,
+   "rarecache-s:0.1": 1.2219702675938606,
+   "rarecache-s:0.3": 1.7932962905615568,
+   "rarecache-s:0.5": 2.468352286145091
+  },
+  {
+   "prompt_len": 32768,
+   "big": 4.604370515793562,
+   "hyb": 1.8208060190081596,
+   "attn_small:0.1:sent": 2.7190671116113663,
+   "specprefill:0.1": 2.199216252192855,
+   "specprefill:0.3": 2.96573537774384,
+   "rarecache-s:0": 2.239419223740697,
+   "rarecache-s:0.1": 3.0530814807862043,
+   "rarecache-s:0.3": 4.943783363327384,
+   "rarecache-s:0.5": 6.794254718348384
+  }
+ ],
+ "niah": [
+  {
+   "config": "rarecache-s:0",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 0.0,
+   "frac": 0.03538199502801273
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 0.0,
+   "frac": 0.020163172521879096
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 0.0,
+   "frac": 0.009391141059853813
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 0.0,
+   "frac": 0.13019263833423125
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 0.0,
+   "frac": 0.11675037867289173
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 0.0,
+   "frac": 0.10772421878505592
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 0.0,
+   "frac": 0.3246461988939865
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 0.0,
+   "frac": 0.3132572876065389
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 0.0,
+   "frac": 0.3061555494779279
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 2048,
+   "n": 30,
+   "accuracy": 0.0,
+   "frac": 0.5191816434294311
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 3584,
+   "n": 30,
+   "accuracy": 0.0,
+   "frac": 0.5099415537707662
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 7680,
+   "n": 30,
+   "accuracy": 0.0,
+   "frac": 0.5045086227038812
+  }
+ ],
+ "ruler": [
+  {
+   "config": "rarecache-s:0",
+   "length": 4096,
+   "task": "cwe",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 4096,
+   "task": "fwe",
+   "n": 15,
+   "score": 0.4666666666666666
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 4096,
+   "task": "niah_multikey_1",
+   "n": 15,
+   "score": 0.06666666666666667
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 4096,
+   "task": "niah_multikey_2",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 4096,
+   "task": "niah_multikey_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 4096,
+   "task": "niah_multiquery",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 4096,
+   "task": "niah_multivalue",
+   "n": 15,
+   "score": 0.03333333333333333
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 4096,
+   "task": "niah_single_1",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 4096,
+   "task": "niah_single_2",
+   "n": 15,
+   "score": 0.13333333333333333
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 4096,
+   "task": "niah_single_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 4096,
+   "task": "qa_1",
+   "n": 15,
+   "score": 0.2
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 4096,
+   "task": "qa_2",
+   "n": 15,
+   "score": 0.2
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 4096,
+   "task": "vt",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 4096,
+   "task": "_frac",
+   "n": 195,
+   "score": 0.020174777890655055
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 4096,
+   "task": "cwe",
+   "n": 15,
+   "score": 0.07333333333333333
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 4096,
+   "task": "fwe",
+   "n": 15,
+   "score": 0.26666666666666666
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 4096,
+   "task": "niah_multikey_1",
+   "n": 15,
+   "score": 0.06666666666666667
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 4096,
+   "task": "niah_multikey_2",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 4096,
+   "task": "niah_multikey_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 4096,
+   "task": "niah_multiquery",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 4096,
+   "task": "niah_multivalue",
+   "n": 15,
+   "score": 0.03333333333333333
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 4096,
+   "task": "niah_single_1",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 4096,
+   "task": "niah_single_2",
+   "n": 15,
+   "score": 0.13333333333333333
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 4096,
+   "task": "niah_single_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 4096,
+   "task": "qa_1",
+   "n": 15,
+   "score": 0.26666666666666666
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 4096,
+   "task": "qa_2",
+   "n": 15,
+   "score": 0.3333333333333333
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 4096,
+   "task": "vt",
+   "n": 15,
+   "score": 0.013333333333333334
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 4096,
+   "task": "_frac",
+   "n": 195,
+   "score": 0.11518567600618769
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 4096,
+   "task": "cwe",
+   "n": 15,
+   "score": 0.2
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 4096,
+   "task": "fwe",
+   "n": 15,
+   "score": 0.4222222222222222
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 4096,
+   "task": "niah_multikey_1",
+   "n": 15,
+   "score": 0.06666666666666667
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 4096,
+   "task": "niah_multikey_2",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 4096,
+   "task": "niah_multikey_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 4096,
+   "task": "niah_multiquery",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 4096,
+   "task": "niah_multivalue",
+   "n": 15,
+   "score": 0.03333333333333333
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 4096,
+   "task": "niah_single_1",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 4096,
+   "task": "niah_single_2",
+   "n": 15,
+   "score": 0.13333333333333333
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 4096,
+   "task": "niah_single_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 4096,
+   "task": "qa_1",
+   "n": 15,
+   "score": 0.5333333333333333
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 4096,
+   "task": "qa_2",
+   "n": 15,
+   "score": 0.4
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 4096,
+   "task": "vt",
+   "n": 15,
+   "score": 0.56
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 4096,
+   "task": "_frac",
+   "n": 195,
+   "score": 0.3113706487529864
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 4096,
+   "task": "cwe",
+   "n": 15,
+   "score": 0.42666666666666664
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 4096,
+   "task": "fwe",
+   "n": 15,
+   "score": 0.711111111111111
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 4096,
+   "task": "niah_multikey_1",
+   "n": 15,
+   "score": 0.06666666666666667
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 4096,
+   "task": "niah_multikey_2",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 4096,
+   "task": "niah_multikey_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 4096,
+   "task": "niah_multiquery",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 4096,
+   "task": "niah_multivalue",
+   "n": 15,
+   "score": 0.03333333333333333
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 4096,
+   "task": "niah_single_1",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 4096,
+   "task": "niah_single_2",
+   "n": 15,
+   "score": 0.13333333333333333
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 4096,
+   "task": "niah_single_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 4096,
+   "task": "qa_1",
+   "n": 15,
+   "score": 0.7333333333333333
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 4096,
+   "task": "qa_2",
+   "n": 15,
+   "score": 0.6
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 4096,
+   "task": "vt",
+   "n": 15,
+   "score": 0.8133333333333334
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 4096,
+   "task": "_frac",
+   "n": 195,
+   "score": 0.5088809998898535
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 8192,
+   "task": "cwe",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 8192,
+   "task": "fwe",
+   "n": 15,
+   "score": 0.39999999999999997
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 8192,
+   "task": "niah_multikey_1",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 8192,
+   "task": "niah_multikey_2",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 8192,
+   "task": "niah_multikey_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 8192,
+   "task": "niah_multiquery",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 8192,
+   "task": "niah_multivalue",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 8192,
+   "task": "niah_single_1",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 8192,
+   "task": "niah_single_2",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 8192,
+   "task": "niah_single_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 8192,
+   "task": "qa_1",
+   "n": 15,
+   "score": 0.26666666666666666
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 8192,
+   "task": "qa_2",
+   "n": 15,
+   "score": 0.13333333333333333
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 8192,
+   "task": "vt",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0",
+   "length": 8192,
+   "task": "_frac",
+   "n": 195,
+   "score": 0.00946520370465913
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 8192,
+   "task": "cwe",
+   "n": 15,
+   "score": 0.05333333333333334
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 8192,
+   "task": "fwe",
+   "n": 15,
+   "score": 0.28888888888888886
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 8192,
+   "task": "niah_multikey_1",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 8192,
+   "task": "niah_multikey_2",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 8192,
+   "task": "niah_multikey_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 8192,
+   "task": "niah_multiquery",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 8192,
+   "task": "niah_multivalue",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 8192,
+   "task": "niah_single_1",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 8192,
+   "task": "niah_single_2",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 8192,
+   "task": "niah_single_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 8192,
+   "task": "qa_1",
+   "n": 15,
+   "score": 0.4666666666666667
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 8192,
+   "task": "qa_2",
+   "n": 15,
+   "score": 0.2
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 8192,
+   "task": "vt",
+   "n": 15,
+   "score": 0.16
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "length": 8192,
+   "task": "_frac",
+   "n": 195,
+   "score": 0.10719511690851347
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 8192,
+   "task": "cwe",
+   "n": 15,
+   "score": 0.18666666666666668
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 8192,
+   "task": "fwe",
+   "n": 15,
+   "score": 0.39999999999999997
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 8192,
+   "task": "niah_multikey_1",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 8192,
+   "task": "niah_multikey_2",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 8192,
+   "task": "niah_multikey_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 8192,
+   "task": "niah_multiquery",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 8192,
+   "task": "niah_multivalue",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 8192,
+   "task": "niah_single_1",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 8192,
+   "task": "niah_single_2",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 8192,
+   "task": "niah_single_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 8192,
+   "task": "qa_1",
+   "n": 15,
+   "score": 0.5333333333333333
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 8192,
+   "task": "qa_2",
+   "n": 15,
+   "score": 0.2
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 8192,
+   "task": "vt",
+   "n": 15,
+   "score": 0.6533333333333333
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "length": 8192,
+   "task": "_frac",
+   "n": 195,
+   "score": 0.30548765330776184
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 8192,
+   "task": "cwe",
+   "n": 15,
+   "score": 0.38
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 8192,
+   "task": "fwe",
+   "n": 15,
+   "score": 0.5777777777777777
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 8192,
+   "task": "niah_multikey_1",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 8192,
+   "task": "niah_multikey_2",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 8192,
+   "task": "niah_multikey_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 8192,
+   "task": "niah_multiquery",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 8192,
+   "task": "niah_multivalue",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 8192,
+   "task": "niah_single_1",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 8192,
+   "task": "niah_single_2",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 8192,
+   "task": "niah_single_3",
+   "n": 15,
+   "score": 0.0
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 8192,
+   "task": "qa_1",
+   "n": 15,
+   "score": 0.6
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 8192,
+   "task": "qa_2",
+   "n": 15,
+   "score": 0.3333333333333333
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 8192,
+   "task": "vt",
+   "n": 15,
+   "score": 0.7466666666666667
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "length": 8192,
+   "task": "_frac",
+   "n": 195,
+   "score": 0.5042699538364109
+  }
+ ],
+ "qa": [
+  {
+   "config": "rarecache-s:0",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.02051389858402951,
+   "f1": 0.19591961722488038,
+   "em": 0.14,
+   "contains": 0.14
+  },
+  {
+   "config": "rarecache-s:0",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.009548393094147897,
+   "f1": 0.1835107733683585,
+   "em": 0.1,
+   "contains": 0.12
+  },
+  {
+   "config": "rarecache-s:0",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.020439839924308038,
+   "f1": 0.17951328997344848,
+   "em": 0.1,
+   "contains": 0.16
+  },
+  {
+   "config": "rarecache-s:0",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.009514972151233427,
+   "f1": 0.22962854349951123,
+   "em": 0.14,
+   "contains": 0.14
+  },
+  {
+   "config": "rarecache-s:0",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.02039593459292087,
+   "f1": 0.5200037348272643,
+   "em": 0.48,
+   "contains": 0.52
+  },
+  {
+   "config": "rarecache-s:0",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.00946114366377307,
+   "f1": 0.7074789915966386,
+   "em": 0.68,
+   "contains": 0.7
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.11731528463827706,
+   "f1": 0.2809090909090909,
+   "em": 0.24,
+   "contains": 0.24
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.10801064465596273,
+   "f1": 0.2568888888888889,
+   "em": 0.16,
+   "contains": 0.18
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.11717622995876092,
+   "f1": 0.3004451805504437,
+   "em": 0.16,
+   "contains": 0.24
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.10804499005292284,
+   "f1": 0.3783520753756048,
+   "em": 0.24,
+   "contains": 0.38
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.11708164188443365,
+   "f1": 0.7997619047619048,
+   "em": 0.76,
+   "contains": 0.8
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.10804844368311536,
+   "f1": 0.7743333333333333,
+   "em": 0.72,
+   "contains": 0.76
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.31425161014913855,
+   "f1": 0.36517893217893216,
+   "em": 0.26,
+   "contains": 0.28
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.30637528253965896,
+   "f1": 0.3404285714285714,
+   "em": 0.18,
+   "contains": 0.28
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.31385176004733834,
+   "f1": 0.5026058507980705,
+   "em": 0.3,
+   "contains": 0.46
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.3064291874779449,
+   "f1": 0.51128655215752,
+   "em": 0.36,
+   "contains": 0.44
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.3139579694939839,
+   "f1": 0.7966666666666666,
+   "em": 0.72,
+   "contains": 0.8
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.306609693606639,
+   "f1": 0.8397777777777777,
+   "em": 0.74,
+   "contains": 0.82
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "source": "hotpot",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.5106809873077974,
+   "f1": 0.40735353535353536,
+   "em": 0.24,
+   "contains": 0.26
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "source": "hotpot",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.5046233167719326,
+   "f1": 0.44,
+   "em": 0.26,
+   "contains": 0.34
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "source": "squad",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.5105772832472194,
+   "f1": 0.6441566005160237,
+   "em": 0.44,
+   "contains": 0.6
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "source": "squad",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.5046836664338915,
+   "f1": 0.6109064558629776,
+   "em": 0.42,
+   "contains": 0.64
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "source": "trivia",
+   "bucket": "4k",
+   "n": 50,
+   "frac": 0.5105997018838556,
+   "f1": 0.8166666666666667,
+   "em": 0.76,
+   "contains": 0.84
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "source": "trivia",
+   "bucket": "8k",
+   "n": 50,
+   "frac": 0.5050067387726273,
+   "f1": 0.8804444444444445,
+   "em": 0.82,
+   "contains": 0.9
+  }
+ ],
+ "gsm8k": [
+  {
+   "config": "rarecache-s:0",
+   "n": 150,
+   "accuracy": 0.7,
+   "format_follow": 0.0,
+   "prompt_tokens": 1913.1733333333334
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "n": 150,
+   "accuracy": 0.7333333333333333,
+   "format_follow": 0.0,
+   "prompt_tokens": 1913.1733333333334
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "n": 150,
+   "accuracy": 0.7466666666666667,
+   "format_follow": 0.02,
+   "prompt_tokens": 1913.1733333333334
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "n": 150,
+   "accuracy": 0.7866666666666666,
+   "format_follow": 0.26,
+   "prompt_tokens": 1913.1733333333334
+  }
+ ],
+ "code": [
+  {
+   "config": "rarecache-s:0",
+   "bucket": "4k",
+   "n": 100,
+   "exact_match": 0.15,
+   "similarity": 0.5775041144650374
+  },
+  {
+   "config": "rarecache-s:0",
+   "bucket": "8k",
+   "n": 100,
+   "exact_match": 0.11,
+   "similarity": 0.5306898783137913
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "bucket": "4k",
+   "n": 100,
+   "exact_match": 0.18,
+   "similarity": 0.5928194692524853
+  },
+  {
+   "config": "rarecache-s:0.1",
+   "bucket": "8k",
+   "n": 100,
+   "exact_match": 0.13,
+   "similarity": 0.552400625016737
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "bucket": "4k",
+   "n": 100,
+   "exact_match": 0.2,
+   "similarity": 0.6119219214070538
+  },
+  {
+   "config": "rarecache-s:0.3",
+   "bucket": "8k",
+   "n": 100,
+   "exact_match": 0.13,
+   "similarity": 0.5755417795650054
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "bucket": "4k",
+   "n": 100,
+   "exact_match": 0.24,
+   "similarity": 0.6229057840274175
+  },
+  {
+   "config": "rarecache-s:0.5",
+   "bucket": "8k",
+   "n": 100,
+   "exact_match": 0.2,
+   "similarity": 0.6024124469144112
+  }
+ ]
+}
