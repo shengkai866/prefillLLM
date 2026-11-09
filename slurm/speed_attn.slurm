@@ -8,10 +8,10 @@
 #SBATCH --gres=gpu:1
 #SBATCH --mem=120G
 #SBATCH --time=10:00:00
-#SBATCH --output=/nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM-attn/logs/%x-%j.out
+#SBATCH --output=/nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM/logs/%x-%j.out
 # TTFT with the position-causal attention kernel (prefill/attn_fused.py, PREFILL_ATTN=triton) on top of the fused fold,
 # on ONE L40S, all five pairs that fit a 48 GB L40S (the 32B pair needs the H100 and is not here). Runs from the
-# attn-kernel worktree; the main checkout and its jobs are untouched. Per pair (results/attn_<tag>_<step>):
+# main checkout (written on the attn-kernel branch, merged 2026-11-08). Per pair (results/attn_<tag>_<step>):
 #   speed   PREFILL_ATTN=triton: speed_allgraph of large alone / small alone / projected cache / ours 10 % and 20 % /
 #           SpecPrefill 10 / 20 / 30 %, + breakdown (per-stage times, incl. the recompute call) + attn_check (real
 #           prompts, first-token logits sdpa vs triton)
@@ -23,7 +23,7 @@
 #   sbatch slurm/speed_attn.slurm      PAIRS="06 17" STEPS="speed sdpa" to restrict
 set -o pipefail
 source /nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM/slurm/env.sh
-cd /nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM-attn || exit 1
+cd /nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM || exit 1
 export PREFILL_FOLD=fused
 CK=$PREFILL_ROOT/checkpoints
 M=$PREFILL_ROOT/models
