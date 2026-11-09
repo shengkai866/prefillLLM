@@ -35,7 +35,7 @@ def break_even(a, b):
     sa, sb = a["ms_per_token"] / 1e3, b["ms_per_token"] / 1e3
     if ta >= tb:
         return "从第 1 个 token 起就不快"
-    if sa <= sb:
+    if sa <= sb * 1.01:  # same decoder (e.g. ours vs 8B alone): per-token times differ only by timing noise
         return "始终更快"
     return f"N ≥ {1 + (tb - ta) / (sa - sb):.0f}"
 
