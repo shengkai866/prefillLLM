@@ -36,7 +36,7 @@ class Decoder:
             kb, vb = torch.randn(shape, dtype=dt, device=dev) * 0.5, torch.randn(shape, dtype=dt, device=dev) * 0.5
         assert kb.shape[2] == Cp, (kb.shape, Cp)
         self.kb, self.vb = kb, vb
-        self.mask = torch.zeros(M.rep, Cp, dtype=dt, device=dev)
+        self.mask = torch.zeros(Cp, dtype=torch.float32, device=dev)  # additive, shared by every head
         self.tok = torch.zeros(1, dtype=torch.long, device=dev)
         self.pos = torch.zeros(1, dtype=torch.long, device=dev)
         self.row = torch.zeros(1, dtype=torch.long, device=dev)
@@ -53,24 +53,25 @@ class Decoder:
 
     def reset(self, n_cached, pos0, tok):
         self.mask.fill_(float("-inf"))
-        self.mask[:, :n_cached] = 0
+        self.mask[:n_cached] = 0
         self.row.fill_(n_cached)
         self.pos.fill_(pos0)
         self.tok.fill_(int(tok))
 
     def _step(self):
         M = self.M
-        self.mask.index_fill_(1, self.row, 0.0)
+        self.mask.index_fill_(0, self.row, 0.0)
         cos, sin = M.cos[self.pos], M.sin[self.pos]
-        amask = self.mask[None, None]  # [1, 1, rep, Cp]
         h = F.embedding(M.ids_in(self.tok), M.embed)
         for i, lw in enumerate(M.layers):
             q, k, v = M._qkv(lw, rms(h, lw["ln1"], M.eps), cos, sin)
             self.kb[i].index_copy_(1, self.row, k)
             self.vb[i].index_copy_(1, self.row, v)
+            # single-token attention as two batched GEMMs over the whole buffer (bandwidth-bound, like flash-decoding;
+            # SDPA with a mask runs one block per KV head here and leaves the GPU mostly idle on long caches)
             qg = q.reshape(M.Hkv, M.rep, M.D)
-            o = F.scaled_dot_product_attention(qg[None], self.kb[i][None], self.vb[i][None], attn_mask=amask,
-                                               scale=M.scaling)[0]
+            s = torch.matmul(qg, self.kb[i].transpose(1, 2)).float() * M.scaling + self.mask  # [Hkv, rep, Cp]
+            o = torch.matmul(torch.softmax(s, -1).to(qg.dtype), self.vb[i])  # [Hkv, rep, D]
             h = M._mlp(lw, M._out(lw, h, o.reshape(M.H, 1, M.D)))
         logits = F.linear(rms(h, M.norm, M.eps), M.lm_head)
         self.tok.copy_(logits.argmax(-1))
