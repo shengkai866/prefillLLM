@@ -147,26 +147,42 @@ class FastQwen3:
             out_logits = F.linear(rms(h[-1:], self.norm, self.eps), self.lm_head)
         return out_logits, hs
 
-    def extend(self, ids, cos, sin, kbuf, vbuf, segs, mask):
+    def extend(self, ids, cos, sin, kbuf, vbuf, segs, mask, pos=None):
         """
         Run new tokens ids [Q] (RoPE tables cos/sin [Q,D] already gathered for their positions) against a KV buffer.
         segs: [(src_start, dst_start, n)] where the new K/V rows are written into the buffer before attention.
         mask: additive [rep*Q, T] mask over buffer positions (from causal_mask_for(..., rep)). GQA is handled by
         folding the query groups into the query-length dimension, so the KV buffer is never copied/repeated.
+        pos: buffer positions [Q] of the new tokens; when given and the Triton kernel is on (attn_enabled), attention
+        runs as pos_attention (query sees rows <= its position) and mask may be None.
         """
         Q = ids.shape[0]
-        amask = mask[None, None]
+        fused = pos is not None and attn_enabled(ids.device)
+        amask = None if fused else mask[None, None]
         h = F.embedding(self.ids_in(ids), self.embed)
         for i, lw in enumerate(self.layers):
             q, k, v = self._qkv(lw, rms(h, lw["ln1"], self.eps), cos, sin)
             for a, b, n in segs:
                 kbuf[i, :, b:b + n] = k[:, a:a + n]
                 vbuf[i, :, b:b + n] = v[:, a:a + n]
-            qg = q.reshape(self.Hkv, self.rep * Q, self.D)
-            o = F.scaled_dot_product_attention(qg[None], kbuf[i][None], vbuf[i][None], attn_mask=amask,
-                                               scale=self.scaling)[0]
+            if fused:
+                o = pos_attention(q, kbuf[i], vbuf[i], pos, self.scaling)
+            else:
+                qg = q.reshape(self.Hkv, self.rep * Q, self.D)
+                o = F.scaled_dot_product_attention(qg[None], kbuf[i][None], vbuf[i][None], attn_mask=amask,
+                                                   scale=self.scaling)[0]
             h = self._mlp(lw, self._out(lw, h, o.reshape(self.H, Q, self.D)))
         return F.linear(rms(h[-1:], self.norm, self.eps), self.lm_head)
+
+
+def attn_enabled(device):
+    """PREFILL_ATTN=triton (default) on CUDA -> position-causal attention via prefill/attn_fused.py; sdpa -> masked SDPA."""
+    return os.environ.get("PREFILL_ATTN", "triton") == "triton" and device.type == "cuda"
+
+
+def pos_attention(q, k, v, pos, scale):
+    from .attn_fused import pos_attention as f
+    return f(q, k, v, pos, scale)
 
 
 def causal_mask_for(positions, T, dtype, device, rep=1):
@@ -301,8 +317,8 @@ class FastHybrid:
         T = ids.shape[0]
         sel = lambda x: torch.cat([x[:s], x[s + m:]])
         pos = sel(torch.arange(T, device=ids.device))
-        mask = causal_mask_for(pos, T, L.embed.dtype, ids.device, L.rep)
-        return L.extend(sel(ids), sel(L.cos[:T]), sel(L.sin[:T]), kbuf, vbuf, [(0, 0, s), (s, s + m, T - s - m)], mask)
+        mask = None if attn_enabled(ids.device) else causal_mask_for(pos, T, L.embed.dtype, ids.device, L.rep)
+        return L.extend(sel(ids), sel(L.cos[:T]), sel(L.sin[:T]), kbuf, vbuf, [(0, 0, s), (s, s + m, T - s - m)], mask, pos=pos)
 
     def prefill(self, ids, patch=None):
         """ids [T]. Returns (kbuf, vbuf, first-token logits). `patch(kbuf, vbuf, s, m)` may edit the middle KV

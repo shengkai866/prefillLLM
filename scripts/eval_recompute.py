@@ -39,6 +39,7 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import torch  # noqa: E402
+import torch.nn.functional as F  # noqa: E402
 
 from evaluate_v2 import mean, qa_scores, task_code, task_gsm8k  # noqa: E402
 from prefill import config as C  # noqa: E402
@@ -374,6 +375,47 @@ BREAKDOWN_COLS = [("small", f"{C.SMALL_NAME} prefill"), ("small_scored", f"{C.SM
                   ("tail", f"{C.LARGE_NAME} 开头 + 尾部"), ("recompute", f"{C.LARGE_NAME} 重算 10% 句子 + 开头 + 尾部"), ("big", f"{C.LARGE_NAME} 单独")]
 
 
+def task_attn_check(E, cfgs, n, pools=("qa_eval", "qa_eval_long")):
+    """Real-weight check of the Triton position-causal attention (prefill/attn_fused.py): the same real prompts through
+    each config with PREFILL_ATTN=sdpa (masked SDPA, the original) and =triton; first-token logits compared
+    (KL(sdpa || triton) in nats, max |diff| / max |logit|, top-1 agreement), per pool bucket."""
+    rows = []
+    prev = os.environ.get("PREFILL_ATTN")
+    try:
+        for pname in pools:
+            pool = PromptPool(pname)
+            cells = collections.defaultdict(list)
+            for i, m in enumerate(pool.meta):
+                cells[m["bucket"]].append(i)
+            for b, idx in sorted(cells.items(), key=lambda x: bucket_tokens(x[0])):
+                for c in cfgs:
+                    kl, rel, top = [], [], []
+                    for i in idx[:n]:
+                        ids = torch.as_tensor(pool.ids(i), device=E.dev)
+                        lg = {}
+                        for mode in ("sdpa", "triton"):
+                            os.environ["PREFILL_ATTN"] = mode
+                            torch.manual_seed(0)
+                            lg[mode] = E.prefill(c, ids)[2].float()[-1]
+                            gc.collect()
+                            torch.cuda.empty_cache()
+                        a, t = lg["sdpa"], lg["triton"]
+                        kl.append(F.kl_div(t.log_softmax(-1), a.log_softmax(-1), log_target=True, reduction="sum").item())
+                        rel.append(((a - t).abs().max() / a.abs().max()).item())
+                        top.append(float(a.argmax() == t.argmax()))
+                    row = {"pool": pname, "bucket": b, "config": c, "n": len(kl), "kl_mean": mean(kl), "kl_max": max(kl),
+                           "rel_max": max(rel), "top1": mean(top)}
+                    rows.append(row)
+                    print(f"[attn_check] {pname} {b} {c}: KL mean={row['kl_mean']:.2e} max={row['kl_max']:.2e} "
+                          f"rel max={row['rel_max']:.2e} top1={row['top1']:.2f} (n={row['n']})", flush=True)
+    finally:
+        if prev is None:
+            os.environ.pop("PREFILL_ATTN", None)
+        else:
+            os.environ["PREFILL_ATTN"] = prev
+    return rows
+
+
 def task_breakdown(E, lengths, reps, frac=0.1):
     """Where the hybrid's time goes (s), per prompt length; every stage timed on its own with synced inputs."""
     rh, S, L, dev = E.rh, E.S, E.L, E.dev
@@ -654,6 +696,7 @@ def main():
     ap.add_argument("--speed_reps", type=int, default=5)
     ap.add_argument("--speed_graph", action="store_true", help="CUDA-graph SpecPrefill's look-ahead steps in the speed task")
     ap.add_argument("--n_qa_long", type=int, default=40)
+    ap.add_argument("--n_attn_check", type=int, default=4, help="attn_check: prompts per pool bucket")
     ap.add_argument("--n_quality", type=int, default=0, help="quality: number of questions (0 = all)")
     ap.add_argument("--long_max", type=int, default=0, help="qa_long / niah_long: skip buckets above this many tokens "
                     "(e.g. 16384 for a 32B target that does not fit 32k on one GPU); 0 = all")
@@ -702,6 +745,8 @@ def main():
         elif task == "speed_allgraph":
             res["speed_allgraph"] = task_speed_allgraph(E, [c for c in a.speed_configs.split(",") if c],
                                                         [int(x) for x in a.speed_lengths.split(",")], a.speed_reps)
+        elif task == "attn_check":
+            res["attn_check"] = task_attn_check(E, cfgs, a.n_attn_check)
         elif task == "breakdown":
             res["breakdown"] = task_breakdown(E, [int(x) for x in a.speed_lengths.split(",")], a.speed_reps)
         elif task == "qa_long":

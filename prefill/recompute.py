@@ -37,6 +37,7 @@ import torch
 import torch.nn.functional as F
 
 from .fast import FastHybrid, Graphed, causal_mask_for, rms
+from .fast import attn_enabled, pos_attention
 from .kv import split_prompt
 
 SCORERS = ("random", "recent", "attn_small", "attn_big", "oracle", "spec")
@@ -209,15 +210,19 @@ def extend_at(L, ids, pos, kbuf, vbuf, n_q=0, lo=0, hi=0, rows=None):
     T = kbuf.shape[2]
     rows = pos if rows is None else rows
     cos, sin = L.cos[pos], L.sin[pos]
-    mask = causal_mask_for(rows, T, L.embed.dtype, ids.device, L.rep)[None, None]
+    fused = attn_enabled(ids.device)  # Triton position-causal attention (prefill/attn_fused.py) instead of masked SDPA
+    mask = None if fused else causal_mask_for(rows, T, L.embed.dtype, ids.device, L.rep)[None, None]
     h = F.embedding(L.ids_in(ids), L.embed)
     score = torch.zeros(hi - lo, dtype=torch.float32, device=ids.device) if n_q else None
     for i, lw in enumerate(L.layers):
         q, k, v = L._qkv(lw, rms(h, lw["ln1"], L.eps), cos, sin)
         kbuf[i].index_copy_(1, rows, k)
         vbuf[i].index_copy_(1, rows, v)
-        qg = q.reshape(L.Hkv, L.rep * Q, L.D)
-        o = F.scaled_dot_product_attention(qg[None], kbuf[i][None], vbuf[i][None], attn_mask=mask, scale=L.scaling)[0]
+        if fused:
+            o = pos_attention(q, kbuf[i], vbuf[i], rows, L.scaling)
+        else:
+            qg = q.reshape(L.Hkv, L.rep * Q, L.D)
+            o = F.scaled_dot_product_attention(qg[None], kbuf[i][None], vbuf[i][None], attn_mask=mask, scale=L.scaling)[0]
         if n_q:
             score += attn_mass(q[:, Q - n_q:], kbuf[i], rows[Q - n_q:], lo, hi, L.scaling)
         h = L._mlp(lw, L._out(lw, h, o.reshape(L.H, Q, L.D)))
