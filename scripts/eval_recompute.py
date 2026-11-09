@@ -50,6 +50,7 @@ from prefill.models import eos_ids, load_pair  # noqa: E402
 from prefill.projector import Projector  # noqa: E402
 from prefill.rarecache import RaReCache  # noqa: E402
 from prefill.recompute import RecomputeHybrid, choose_units, extend_at, segment_ids, small_prefill_scored  # noqa: E402
+from prefill.sparse import DEFAULTS as FLEX_DEFAULTS, flex_prefill, parse_flex  # noqa: E402
 
 FRACS = (0.02, 0.05, 0.1, 0.2)
 DEFAULT_CFGS = ["big", "hyb"] + [f"{s}:{f}" for s in ("attn_big", "attn_small") for f in FRACS] + \
@@ -63,6 +64,8 @@ def parse(cfg):
     """-> (scorer, fraction, unit) with unit None | int block size | 'sent'"""
     if cfg in ("big", "small", "hyb", "oracle"):
         return cfg, 0.0, None
+    if cfg.startswith("flexprefill"):  # sparse-attention baseline (prefill/sparse.py): fraction = gamma, rest in the string
+        return "flexprefill", parse_flex(cfg).get("gamma", FLEX_DEFAULTS["gamma"]), cfg
     s, f, *u = cfg.split(":")
     u = u[0] if u else None
     return s, float(f), (None if u is None else u if u == "sent" or u.startswith("lah") else int(u[1:]))
@@ -89,6 +92,9 @@ def label(cfg):
         return SCORER_ZH["oracle"]
     if s == "specprefill":
         return f"SpecPrefill 保留整段 {f:.0%}" + (f"，{unit_zh(u)}" if u is not None else "")
+    if s == "flexprefill":
+        kw = {**FLEX_DEFAULTS, **parse_flex(cfg)}
+        return f"FlexPrefill 稀疏注意力（γ={kw['gamma']}，τ={kw['tau']}）"
     if s.startswith("rarecache"):
         o = rarecache_opts(s)
         return f"RaReCache 重算整段 {f:.0%}" + ("，强制开头/尾部" if "s" in o else "") + ("，fp32 映射" if "f" in o else "")
@@ -135,6 +141,14 @@ class Engine:
         if s == "specprefill":
             kb, vb, lg, n = self.rh.prefill_specprefill(ids, f, n_lah=int(u[3:]) if u else None)
             return kb, vb, lg, n / ids.shape[0]
+        if s == "flexprefill":  # full cache; fraction = share of the causal attention blocks computed
+            L = self.L
+            T = ids.shape[0]
+            kb = torch.empty(L.n_layers, L.Hkv, T, L.D, dtype=L.embed.dtype, device=ids.device)
+            vb = torch.empty_like(kb)
+            lg, ratio = flex_prefill(L, ids, kb, vb, **parse_flex(cfg))
+            nb = -(-T // FLEX_DEFAULTS["block_size"])
+            return kb, vb, lg, ratio / ((nb + 1) / (2 * nb))  # FlexPrefill counts the full n x n grid
         if s.startswith("rarecache"):
             o = rarecache_opts(s)
             self.rc.fp32 = "f" in o
@@ -331,6 +345,8 @@ def graph_kind(cfg):
         return ("ours" if s == "attn_small" else "drop"), f
     if s == "specprefill" and u is None:
         return "spec", f
+    if s == "flexprefill":  # per-layer host-side index selection: not graphable, timed eagerly as released
+        return "eager", f
     raise ValueError(f"{cfg}: no graphed version in prefill/graphs.py")
 
 
@@ -346,8 +362,8 @@ def task_speed_allgraph(E, cfgs, lengths, reps):
             run = None
             try:
                 kind, f = graph_kind(c)
-                run = build_graphs(E.rh, kind, f, ids)
-                if T == lengths[0]:
+                run = (lambda x, c=c: E.prefill(c, x)[2]) if kind == "eager" else build_graphs(E.rh, kind, f, ids)
+                if T == lengths[0] and kind != "eager":
                     eager = E.prefill(c, ids)[2].float()
                     check[c] = (run(ids).float() - eager).abs().max().item() / eager.abs().max().item()
                 row[c] = time_call(lambda: run(ids), repeats=reps, warmup=2)

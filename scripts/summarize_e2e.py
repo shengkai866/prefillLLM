@@ -16,7 +16,7 @@ from prefill import config as C  # noqa: E402
 METHODS = [("8B 单独", "06", "big"), ("4B 单独", "4B", "small"), ("1.7B 单独", "17", "small"), ("0.6B 单独", "06", "small"),
            ("投影缓存不重算（0.6B）", "06", "hyb"), ("我们 0.6B→8B", "06", "attn_small:0.1:sent"),
            ("我们 1.7B→8B", "17", "attn_small:0.1:sent"), ("SpecPrefill 10%（0.6B）", "06", "specprefill:0.1"),
-           ("SpecPrefill 10%（1.7B）", "17", "specprefill:0.1")]
+           ("SpecPrefill 10%（1.7B）", "17", "specprefill:0.1"), ("FlexPrefill γ=0.9（稀疏注意力）", "flex_q8", "flexprefill")]
 G = 2 ** 30
 
 
@@ -44,7 +44,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--results", default=C.RESULTS_DIR)
     a = ap.parse_args()
-    R = {s: load(a.results, s) for s in ("06", "17", "4B")}
+    R = {s: load(a.results, s) for s in ("06", "17", "4B", "flex_q8")}
     meta = next((r["meta"] for r in R.values() if r.get("meta")), {})
     out = ["# 端到端延迟、显存、batch 吞吐（L40S，目标模型 Qwen3-8B）", "",
            f"生成：{time.strftime('%F %T')}，`scripts/summarize_e2e.py`；数据 `results/e2e_<setup>`（`scripts/bench_e2e.py`，"
@@ -73,7 +73,7 @@ def main():
     for T in lens:
         for ol, ost, ocfg in METHODS[5:7]:
             o = find(R[ost].get("decode", []), T, ocfg)
-            for xl, xst, xcfg in [METHODS[0], METHODS[1], METHODS[2], METHODS[7], METHODS[8]]:
+            for xl, xst, xcfg in [METHODS[0], METHODS[1], METHODS[2], METHODS[7], METHODS[8], METHODS[9]]:
                 x = find(R[xst].get("decode", []), T, xcfg)
                 if o and x:
                     out.append(f"| {T // 1024}k | {ol} | {xl} | {break_even(o, x)} |")

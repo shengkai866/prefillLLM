@@ -105,8 +105,10 @@ def task_decode(E, cfgs, lengths, gens, reps):
             row = {"prompt_len": T, "config": c}
             try:
                 kind, f = graph_kind(c)
-                run = build_graphs(E.rh, kind, f, ids)
+                # FlexPrefill: per-layer host-side selection, not graphable -> timed eagerly (as released)
+                run = (lambda x, c=c: E.prefill(c, x)[2]) if kind == "eager" else build_graphs(E.rh, kind, f, ids)
                 row["ttft"] = time_call(lambda: run(ids), repeats=reps, warmup=2)
+                row["graphed"] = kind != "eager"
                 del run
                 free()
                 M, n, p0 = decode_setup(E, c, ids)
@@ -131,7 +133,8 @@ def task_memory(E, cfgs, lengths, gens, small_hf, large_hf):
         ids = rand_ids(T)
         for c in cfgs:
             s, _, _ = parse(c)
-            uses = ["small"] if c == "small" else ["large"] if c == "big" else ["small", "large"] + (["fold"] if s in ("hyb", "attn_small") else [])
+            uses = ["small"] if c == "small" else ["large"] if c in ("big",) or s == "flexprefill" else \
+                ["small", "large"] + (["fold"] if s in ("hyb", "attn_small") else [])
             row = {"prompt_len": T, "config": c, "weights": sum(W[u] for u in uses), "uses": uses}
             free()
             try:

@@ -29,8 +29,9 @@ from prefill import config as C  # noqa: E402
 
 RUNS = {"06": "fused_06", "17": "fused_17", "xll1q8": "fused_ll1toq8", "32": "e32"}  # pair -> run prefix
 FALLBACK = {"xll1q8": "ll1toq8"}
-SINGLE = {"ours": "attn_small:0.1:sent", "spec": "specprefill:0.1"}
-MULTI = {"ours": "ours:0.1:sent", "spec": "spec-each:0.1"}  # spec-each = SpecPrefill re-prefilled for every question
+SINGLE = {"ours": "attn_small:0.1:sent", "spec": "specprefill:0.1", "flex": "flexprefill"}
+MULTI = {"ours": "ours:0.1:sent", "spec": "spec-each:0.1", "flex": "flex"}  # spec-each = SpecPrefill re-prefilled per question
+SPARSE = {"flex_q8": "sparse_q8"}  # FlexPrefill baseline runs (slurm/sparse_baseline.slurm): results/sparse_q8_<step>
 SAME_PROMPTS_16K_64K = {"qasper", "longhealth", "contractnli"}
 
 
@@ -39,8 +40,10 @@ def sections(mid):
     s1 = ("1. 目标 Qwen3-8B（L40S）",
           [("8B 单独", "06", "big"), (f"{mid} 单独", "mid", "small"), ("1.7B 单独", "17", "small"),
            ("我们 0.6B→8B", "06", "ours"), ("我们 1.7B→8B", "17", "ours"), ("我们 Llama-1B→8B", "xll1q8", "ours"),
-           ("SpecPrefill 10%（0.6B 打分）", "06", "spec"), ("SpecPrefill 10%（1.7B 打分）", "17", "spec")],
-          [(f"我们 0.6B − {mid}", 3, 1), (f"我们 1.7B − {mid}", 4, 1)], True, set())
+           ("SpecPrefill 10%（0.6B 打分）", "06", "spec"), ("SpecPrefill 10%（1.7B 打分）", "17", "spec"),
+           ("FlexPrefill γ=0.9（稀疏注意力）", "flex_q8", "flex")],
+          [(f"我们 0.6B − {mid}", 3, 1), (f"我们 1.7B − {mid}", 4, 1), ("我们 0.6B − FlexPrefill", 3, 8),
+           ("我们 1.7B − FlexPrefill", 4, 8)], True, set())
     s2 = ("2. 目标 Qwen3-32B（32B 的结果在 H100 上，质量与 GPU 无关）",
           [("32B 单独", "32", "big"), ("我们 1.7B→32B", "32", "ours"), ("SpecPrefill 10%（1.7B 打分）", "32", "spec"),
            ("1.7B 单独", "32", "small"), ("8B 单独", "06", "big"), (f"{mid} 单独", "mid", "small")],
@@ -55,6 +58,8 @@ class Runs:
     def dir(self, src, step):
         if src == "mid":
             return f"mid_{self.mid}_{step}"
+        if src in SPARSE:
+            return f"{SPARSE[src]}_{step}"
         if step in ("quality", "quality_mq", "bench"):
             return f"{step}_{src}"
         d = f"{RUNS[src]}_{step}"
@@ -186,7 +191,10 @@ def main():
            "配置 `small`：它自己 prefill 并自己解码）；其余列来自各 pair 的运行（`results/fused_<tag>_<step>`、`e32_<step>`、`quality_<pair>`、"
            "`quality_mq_<pair>`、`bench_<pair>`）。我们 = 重算 10% 中间 token（按句子，小模型注意力打分），其余用投影 KV，大模型解码。"
            "同一文档多问题的 SpecPrefill 是每个问题重新 prefill（spec-each），单问题是官方 SpecPrefill 保留 10%。"
-           "首 token 延迟一格 = 毫秒（相对同一次运行里大模型单独的加速比）。“-” = 没有这一项或不可比。", "",
+           "首 token 延迟一格 = 毫秒（相对同一次运行里大模型单独的加速比）。“-” = 没有这一项或不可比。"
+           "FlexPrefill = 稀疏注意力 baseline（`prefill/sparse.py`，官方 triton 实现，默认 γ=0.9、τ=0.1、min_budget 512）：大模型自己 prefill 全部 token，"
+           "每层注意力只算选中的块，得到完整的 cache；它每层在主机上选块，不能整段 CUDA graph，延迟是 eager 计时（官方实现原样）；"
+           "多问题设置下它 prefill 一次文档，问题接在后面复用 cache。结果来自 `results/sparse_q8_<step>`（`slurm/sparse_baseline.slurm`）。", "",
            "**指标**：自由回答的 QA 给两行。“F1”= 输出第一行和标准答案的 token F1（各基准的原始指标）；“包含答案”= 归一化后的标准答案出现在输出里"
            "（`scripts/items.py`）。更大的模型回答更啰嗦，F1 会被压低：32B 在抽取式 QA 4k 上 F1 0.638、8B 0.772，但包含答案都是 0.773。"
            "**跨模型比较看“包含答案”**；同一个大模型解码的方法之间（大模型单独 / 我们 / SpecPrefill）两种指标都可用。"

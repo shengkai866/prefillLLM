@@ -35,6 +35,7 @@ ALONE = [("0.6B", "fused_06", "small"), ("1.7B", "fused_17", "small"), ("4B", "m
 OURS = [("0%", "hyb"), ("10%", "attn_small:0.1:sent"), ("20%", "attn_small:0.2:sent")]
 SPEC = [("10%", "specprefill:0.1"), ("20%", "specprefill:0.2"), ("30%", "specprefill:0.3")]
 DROP = [("drop", "drop-attn_small:0.2:sent")]
+FLEX = [("flex 0.9", "flexprefill"), ("flex 0.95", "flexprefill:0.95")]  # results/sparse_q8_<step> (Qwen3-8B target)
 
 
 def avg(rows, cfg, val, **m):
@@ -63,7 +64,8 @@ class Res:
         self.root, self.c = root, {}
 
     def get(self, prefix, step):
-        d = {"quality": f"quality_{prefix.split('_')[-1]}"}.get(step, f"{prefix}_{step}") if prefix != "mid_4B" else f"mid_4B_{step}"
+        d = f"{prefix}_{step}" if prefix in ("mid_4B", "sparse_q8") else \
+            {"quality": f"quality_{prefix.split('_')[-1]}"}.get(step, f"{prefix}_{step}")
         if d not in self.c:
             try:
                 self.c[d] = json.load(open(os.path.join(self.root, d, "results.json")))
@@ -87,9 +89,10 @@ def points(R, pair, step, L, fn):
         if x is not None and y is not None:
             pts.append(("alone", lab, x, y))
     res = R.get(prefix, step)
-    for fam, lst in (("ours", OURS), ("spec", SPEC), ("drop", DROP)):
+    for fam, lst, pre in (("ours", OURS, prefix), ("spec", SPEC, prefix), ("drop", DROP, prefix), ("flex", FLEX, "sparse_q8")):
+        r = res if pre == prefix else R.get(pre, step)
         for lab, cfg in lst:
-            x, y = R.ttft(prefix, cfg, L), (fn(res, cfg) if res else None)
+            x, y = R.ttft(pre, cfg, L), (fn(r, cfg) if r else None)
             if x is not None and y is not None:
                 pts.append((fam, lab, x, y))
     return pts
@@ -138,7 +141,8 @@ def place_labels(fig, labels):
 STYLE = {"ours": (BLUE, "o", "Ours: projected cache, recompute 0/10/20%"),
          "spec": (ORANGE, "s", "SpecPrefill: keep 10/20/30%"),
          "alone": (AQUA, "D", "Model alone: 0.6B / 1.7B / 4B / 8B"),
-         "drop": (GREY, "x", "Drop the rest (ablation, 20%)")}
+         "drop": (GREY, "x", "Drop the rest (ablation, 20%)"),
+         "flex": (INK2, "^", "FlexPrefill sparse attention, γ 0.9/0.95 (eager, as released)")}
 
 
 def plot(R, pair, out_dir):
@@ -161,12 +165,12 @@ def plot(R, pair, out_dir):
         front = frontier(pts)
         fx = sorted(front, key=lambda p: p[2])
         ax.step([p[2] for p in fx], [p[3] for p in fx], where="post", color=AXIS, linewidth=1.2, zorder=1)
-        for fam in ("drop", "alone", "spec", "ours"):
+        for fam in ("drop", "flex", "alone", "spec", "ours"):
             q = sorted([p for p in pts if p[0] == fam], key=lambda p: p[2])
             if not q:
                 continue
             col, mk, _ = STYLE[fam]
-            if fam in ("ours", "spec", "alone"):
+            if fam in ("ours", "spec", "alone", "flex"):
                 ax.plot([p[2] for p in q], [p[3] for p in q], color=col, linewidth=2, zorder=2, alpha=0.9)
             ax.scatter([p[2] for p in q], [p[3] for p in q], color=col, marker=mk, s=46, zorder=3,
                        edgecolors="#fcfcfb" if mk != "x" else None, linewidths=1.5 if mk != "x" else 2)
@@ -180,9 +184,9 @@ def plot(R, pair, out_dir):
         ax.set_xlabel(f"TTFT at {L // 1024}k (ms, log)", fontsize=8, color=INK2)
         summary.append((title, L, sorted(pts, key=lambda p: p[2]), front))
     handles = [plt.Line2D([], [], color=STYLE[f][0], marker=STYLE[f][1], linestyle="-" if f != "drop" else "",
-                          markersize=7, linewidth=2, label=STYLE[f][2]) for f in ("ours", "spec", "alone", "drop")]
+                          markersize=7, linewidth=2, label=STYLE[f][2]) for f in ("ours", "spec", "alone", "drop", "flex")]
     handles.append(plt.Line2D([], [], color=AXIS, linewidth=1.2, label="Pareto frontier (bold labels = on it)"))
-    fig.legend(handles=handles, loc="upper center", ncol=5, frameon=False, fontsize=9, bbox_to_anchor=(0.5, 1.0))
+    fig.legend(handles=handles, loc="upper center", ncol=3, frameon=False, fontsize=9, bbox_to_anchor=(0.5, 1.0))
     fig.suptitle(f"Speed vs quality, Qwen3-{small} as the small model, Qwen3-8B target (L40S, all methods CUDA-graphed)",
                  y=1.035, fontsize=12, color=INK)
     fig.patch.set_facecolor("#fcfcfb")
@@ -201,7 +205,7 @@ def main():
     ap.add_argument("--pairs", default="06,17")
     a = ap.parse_args()
     R = Res(a.results)
-    fam_zh = {"ours": "我们", "spec": "SpecPrefill", "alone": "单独", "drop": "丢弃其余"}
+    fam_zh = {"ours": "我们", "spec": "SpecPrefill", "alone": "单独", "drop": "丢弃其余", "flex": "FlexPrefill"}
     md = ["# 速度–质量 Pareto（目标 Qwen3-8B，L40S）", "",
           f"生成：{time.strftime('%F %T')}，`scripts/plot_pareto.py`；图在 `results/figures/pareto_<pair>.png|pdf`。"
           "每个面板：横轴 = 该长度的首 token 延迟（所有方法 CUDA graph，融合 fold），纵轴 = 质量；自由回答 QA 用“包含答案”。"

@@ -44,7 +44,8 @@ def label(cfg):
             "ours": f"投影缓存 + 每问重算 {f:.0%}{unit}（不保留）", "ours-acc": f"投影缓存 + 每问重算 {f:.0%}{unit}（累积保留）",
             "pre": f"投影缓存 + 文档阶段重算 {f:.0%}{unit}" + (f" + 每问补 {g:.0%}（累积）" if g else "（每问不重算）"),
             "ours-each": f"我们，每问重新 prefill，重算 {f:.0%}{unit}", "spec-agn": f"SpecPrefill 不看问题，保留 {f:.0%}",
-            "spec-q1": f"SpecPrefill 按第 1 问选择，保留 {f:.0%}", "spec-each": f"SpecPrefill 每问重新 prefill，保留 {f:.0%}"}[s]
+            "spec-q1": f"SpecPrefill 按第 1 问选择，保留 {f:.0%}", "spec-each": f"SpecPrefill 每问重新 prefill，保留 {f:.0%}",
+            "flex": f"FlexPrefill 稀疏注意力 prefill 文档（γ={f}），问题接在后面（缓存复用）"}[s]
 
 
 QBINS = ((1, 1), (2, 5), (6, 10), (11, 20))  # question index ranges (1-based) reported for long question sequences

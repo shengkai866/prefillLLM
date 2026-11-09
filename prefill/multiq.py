@@ -27,6 +27,8 @@ Configs (MultiQ.doc builds the state, MultiQ.ask answers one question from it):
   spec-each:f          SpecPrefill re-run per question on document + question (nothing is reused; = the single-question
                        benchmark setting)
   ours-each:f[:unit]   our standard single-prompt pipeline re-run per question (nothing reused)
+  flex[:gamma]         sparse-attention baseline: the large model prefills the document with FlexPrefill attention
+                       (prefill/sparse.py, official defaults, gamma 0.9); questions extend that full cache like big
 Fractions mean what they mean in scripts/eval_recompute.py (ours: of the middle tokens; spec: of the whole prompt).
 """
 import torch
@@ -35,13 +37,15 @@ from .fast import kv_to_dynamic_cache
 from .kv import greedy_decode, split_prompt
 from .recompute import choose_units, extend_at, prefill_kept, segment_ids, spec_importance, spec_select
 
-METHODS = ("big", "small", "hyb", "ours", "ours-acc", "pre", "spec-agn", "spec-q1", "spec-each", "ours-each")
+METHODS = ("big", "small", "hyb", "ours", "ours-acc", "pre", "spec-agn", "spec-q1", "spec-each", "ours-each", "flex")
 
 
 def parse_cfg(cfg):
     """-> (method, fraction, unit) with unit None | int block size | 'sent'"""
     s, *rest = cfg.split(":")
     assert s in METHODS, cfg
+    if s == "flex":  # fraction = FlexPrefill gamma
+        return s, (float(rest[0]) if rest else 0.9), None
     f = float(rest[0]) if rest else 0.0
     u = rest[1] if len(rest) > 1 else None
     return s, f, (None if u is None else u if u == "sent" else int(u[1:]))
@@ -77,6 +81,12 @@ class MultiQ:
             kb = torch.zeros(M.n_layers, M.Hkv, T + self.q_max, M.D, dtype=M.embed.dtype, device=ids.device)
             vb = torch.zeros_like(kb)  # free V rows get weight 0, but 0 x NaN = NaN
             M.prefill(ids, kb, vb, logits=False)
+            st.update(kb=kb, vb=vb)
+        elif meth == "flex":
+            from .sparse import flex_prefill
+            kb = torch.zeros(L.n_layers, L.Hkv, T + self.q_max, L.D, dtype=L.embed.dtype, device=ids.device)
+            vb = torch.zeros_like(kb)
+            flex_prefill(L, ids, kb, vb, logits=False, gamma=f)
             st.update(kb=kb, vb=vb)
         elif meth == "hyb":
             kb, vb, _ = self.rh.prefill(ids)
@@ -129,10 +139,10 @@ class MultiQ:
         dev = q_ids.device
         qpos = torch.arange(T, T + Q, device=dev)
         st["n_q"] += 1
-        if meth in ("big", "small", "hyb"):
+        if meth in ("big", "small", "hyb", "flex"):
             M = self.S if meth == "small" else self.L
             lg, _ = extend_at(M, q_ids, qpos, st["kb"], st["vb"])
-            return st["kb"][:, :, :T + Q], st["vb"][:, :, :T + Q], lg, 1.0 if meth == "big" else 0.0, None
+            return st["kb"][:, :, :T + Q], st["vb"][:, :, :T + Q], lg, 1.0 if meth in ("big", "flex") else 0.0, None
         if meth == "pre" and st["k"] == 0:  # everything was done at document time
             lg, _ = extend_at(self.L, q_ids, qpos, st["kb"], st["vb"])
             return st["kb"][:, :, :T + Q], st["vb"][:, :, :T + Q], lg, 0.0, None

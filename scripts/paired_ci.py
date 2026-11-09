@@ -44,6 +44,12 @@ PAIRS = [  # (pair, label, runs, mid label, mid runs, mid config)
     ("32", "Qwen3-1.7B → Qwen3-32B", {**runs("e32", "32")[0]}, "8B 单独", BIG8, "big"),
 ]
 FALLBACK = {"fused_ll1toq8": "ll1toq8"}
+# FlexPrefill baseline of each pair's target (slurm/sparse_baseline.slurm -> results/sparse_<target>_<step>)
+FLEX = {"06": "sparse_q8", "17": "sparse_q8", "xll1q8": "sparse_q8", "ll": "sparse_ll8", "xq17ll8": "sparse_ll8"}
+
+
+def flex_cfg(step):
+    return "flex" if step in ("multiq", "quality_mq") else "flexprefill"
 BENCHES = [("ruler@4096", "RULER 4k"), ("ruler@8192", "RULER 8k"), ("qa@4k", "抽取式 QA 4k"), ("qa@8k", "抽取式 QA 8k"),
            ("qa_long@16k", "长 QA 16k"), ("qa_long@32k", "长 QA 32k"), ("multiq@4k", "同一文档 5 问 4k"),
            ("multiq@8k", "同一文档 5 问 8k"), ("gov_report", "gov_report"), ("qmsum", "QMSum"), ("lcc", "LCC"),
@@ -142,7 +148,10 @@ def main():
            "（见 REPORT_2026-11-02 §2.3），所以不和 8B 单独比。每个格子是独立的检验，没有做多重比较校正：几十项里有一两项“显著”可能是偶然。", ""]
     for pair, label, R, mid_label, MR, mid_cfg in PAIRS:
         rows = []
-        head = ["基准", "指标", "n", f"我们 − 大模型单独", "我们 − SpecPrefill 10%"] + ([f"我们 − {mid_label}", "n（中等模型配对）"] if mid_label else [])
+        FR = {s: f"{FLEX[pair]}_{s}" for s in STEPS} if pair in FLEX else None
+        has_flex = FR is not None and any(os.path.exists(os.path.join(a.results, d, "generations.jsonl")) for d in FR.values())
+        head = ["基准", "指标", "n", f"我们 − 大模型单独", "我们 − SpecPrefill 10%"] + \
+            ([f"我们 − {mid_label}", "n（中等模型配对）"] if mid_label else []) + (["我们 − FlexPrefill γ=0.9"] if has_flex else [])
         for bench, name in BENCHES:
             st = step_of(bench)
             A = L.get(R.get(st), st).get(bench, {})
@@ -155,16 +164,22 @@ def main():
                 # 32B LongBench code: raw prompts make 32B (hence ours, decoded by 32B) answer in prose -> not comparable with 8B
                 skip_mid = pair == "32" and bench in ("lcc", "repobench-p")
                 r_mid = paired(A, M, ours(st), mid_cfg, field, st == "bench", rng, a.boot) if mid_label and not skip_mid else None
-                if r_big is None and r_spec is None and r_mid is None:
+                r_flex = None
+                if has_flex:
+                    Fx = L.get(FR.get(st), st).get(bench, {})
+                    r_flex = paired(A, Fx, ours(st), flex_cfg(st), field, st == "bench", rng, a.boot)
+                if r_big is None and r_spec is None and r_mid is None and r_flex is None:
                     continue
-                n = (r_big or r_spec or r_mid)[5]
-                cells = [name, fname, str(n), fmt(r_big), fmt(r_spec)] + ([fmt(r_mid), str(r_mid[5]) if r_mid else "-"] if mid_label else [])
+                n = (r_big or r_spec or r_mid or r_flex)[5]
+                cells = [name, fname, str(n), fmt(r_big), fmt(r_spec)] + ([fmt(r_mid), str(r_mid[5]) if r_mid else "-"] if mid_label else []) \
+                    + ([fmt(r_flex)] if has_flex else [])
                 rows.append("| " + " | ".join(cells) + " |")
-                allres.setdefault(pair, {})[f"{bench}|{field}"] = {"vs_big": r_big, "vs_spec": r_spec, "vs_mid": r_mid}
+                allres.setdefault(pair, {})[f"{bench}|{field}"] = {"vs_big": r_big, "vs_spec": r_spec, "vs_mid": r_mid,
+                                                                    "vs_flex": r_flex}
         if not rows:
             continue
         tally = []
-        for key, lab in (("vs_big", "大模型"), ("vs_spec", "SpecPrefill 10%"), ("vs_mid", mid_label)):
+        for key, lab in (("vs_big", "大模型"), ("vs_spec", "SpecPrefill 10%"), ("vs_mid", mid_label), ("vs_flex", "FlexPrefill")):
             v = [x[key] for k, x in allres[pair].items() if x.get(key) and k.endswith("|score")]
             if v:
                 tally.append(f"对{lab}：显著好 {sum(r[3] > 0 for r in v)}，显著差 {sum(r[4] < 0 for r in v)}，不显著 "
