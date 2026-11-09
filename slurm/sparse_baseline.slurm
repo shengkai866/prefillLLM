@@ -54,7 +54,7 @@ run_target() {  # in a subshell: the target's environment must not leak
     for S in ${STEPS:-smoke speed main long quality multiq longbench e2e bench}; do
       step "$T / $S"
       case $S in
-        smoke)     python tests/gpu_check_flexprefill.py || { echo "FAILED_TARGET: $T:smoke (FlexPrefill does not run here)"; exit 1; } ;;
+        smoke)     python tests/gpu_check_flexprefill.py || { echo "FAILED_TARGET: $T:smoke (FlexPrefill does not run correctly here)"; exit 1; } ;;
         speed)     ev python scripts/eval_recompute.py --projector $P --out_dir ${R}_speed --tasks speed_allgraph --configs big \
                      --speed_configs big,$FX --speed_lengths $LEN --force ;;
         main)      ev python scripts/eval_recompute.py --projector $P --out_dir ${R}_main --tasks niah,ruler,qa,gsm8k,code --configs $FX --force ;;
