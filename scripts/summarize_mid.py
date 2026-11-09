@@ -62,7 +62,10 @@ class Runs:
 
 
 def avg(rows, cfg, val, **match):
-    v = [r[val] for r in rows if r.get("config") == cfg and all(str(r.get(k)) == str(x) for k, x in match.items()) and r.get(val) is not None]
+    """Mean of `val` over the rows of `cfg` matching `match`. Rows whose task starts with "_" are bookkeeping, not scores
+    (RULER stores the recomputed fraction as task "_frac", score ~0.1) and are skipped."""
+    v = [r[val] for r in rows if r.get("config") == cfg and not str(r.get("task", "")).startswith("_")
+         and all(str(r.get(k)) == str(x) for k, x in match.items()) and r.get(val) is not None]
     return mean(v) if v else None
 
 
