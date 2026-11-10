@@ -16,8 +16,8 @@ import torch
 
 from .fast import FastBig, Graphed
 from .kv import split_prompt
-from .recompute import (LookaheadGraph, choose_units, extend_at, prefill_kept, segment_ids, small_prefill_scored,
-                        spec_scores, spec_select)
+from .recompute import (LookaheadGraph, choose_units, extend_at, lah_mass, lookahead, prefill_kept, segment_ids,
+                        small_prefill_into, small_prefill_scored, spec_scores, spec_select)
 
 
 def build(rh, kind, frac, ids):
@@ -63,6 +63,36 @@ def build(rh, kind, frac, ids):
             hs, pos = select(x)
             assert pos.shape == pos0.shape, "selection size changed; graphs are per prompt"
             return g2(hs, x, pos) if kind == "ours" else g2(x, pos)
+        return run
+
+    if kind.startswith("ours_lah"):  # 'ours_lah|<n_lah>|<only 0/1>': ours with a draft answer in the selection score
+        _, nl, only = kind.split("|")
+        nl, only = int(nl), only == "1"
+        k = min(m, int(round(frac * m)))
+        lah = LookaheadGraph(S, T, nl)
+        eos = S.own_eos(rh.eos)
+        g1 = Graphed(lambda x: small_prefill_into(S, x, lah.kb, lah.vb, t, s, s + m, qb=lah.qb, tail=not only), ids, **nocopy)
+        mass = {}
+
+        def select(x):
+            hs, sc, logits = g1(x)
+            n = lookahead(S, lah, logits, T, nl, eos)
+            if n not in mass:
+                mass[n] = Graphed(lambda n=n: lah_mass(S, lah.qb, lah.kb, T, n, s, s + m, with_last=only))
+            idx = choose_units(sc + mass[n](), segment_ids(x[s:s + m], "sent", rh.boundary, rh.cap), k)
+            return hs, torch.cat([ar(0, s), s + idx, ar(s + m, T)])
+
+        hs0, pos0 = select(ids)
+
+        def tail(hs, x, pos):
+            kb, vb = rh.stage_fold(hs[:, s:s + m], s, T)
+            return extend_at(L, x[pos], pos, kb, vb)[0]
+        g2 = Graphed(tail, hs0, ids, pos0, **nocopy)
+
+        def run(x):
+            hs, pos = select(x)
+            assert pos.shape == pos0.shape, "selection size changed; graphs are per prompt"
+            return g2(hs, x, pos)
         return run
 
     if kind == "spec":

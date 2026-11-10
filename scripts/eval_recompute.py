@@ -49,7 +49,7 @@ from prefill.mixdata import PromptPool, Tok  # noqa: E402
 from prefill.models import eos_ids, load_pair  # noqa: E402
 from prefill.projector import Projector  # noqa: E402
 from prefill.rarecache import RaReCache  # noqa: E402
-from prefill.recompute import RecomputeHybrid, choose_units, extend_at, segment_ids, small_prefill_scored  # noqa: E402
+from prefill.recompute import RecomputeHybrid, choose_units, extend_at, lah_scorer, segment_ids, small_prefill_scored  # noqa: E402
 from prefill.sparse import DEFAULTS as FLEX_DEFAULTS, flex_prefill, parse_flex  # noqa: E402
 
 FRACS = (0.02, 0.05, 0.1, 0.2)
@@ -100,6 +100,10 @@ def label(cfg):
         return f"RaReCache 重算整段 {f:.0%}" + ("，强制开头/尾部" if "s" in o else "") + ("，fp32 映射" if "f" in o else "")
     if s.startswith("drop-"):
         return f"丢弃其余（不投影）：{SCORER_ZH[s[5:]]} {f:.0%}" + (f"，{unit_zh(u)}" if u is not None else "")
+    if s.startswith("attn_lah"):
+        n_lah, only = lah_scorer(s)
+        who = "只用" if only else f"尾部 {C.SMALL_NAME} 注意力 +"
+        return f"{who}草稿答案 {n_lah - 1} token 的注意力 {f:.0%}" + (f"，{unit_zh(u)}" if u is not None else "")
     return f"{SCORER_ZH[s]} {f:.0%}" + (f"，{unit_zh(u)}" if u is not None else "")
 
 
@@ -343,6 +347,9 @@ def graph_kind(cfg):
         return s, 0.0
     if s in ("attn_small", "drop-attn_small") and u == "sent":
         return ("ours" if s == "attn_small" else "drop"), f
+    if s.startswith("attn_lah") and u == "sent":
+        n_lah, only = lah_scorer(s)
+        return f"ours_lah|{n_lah}|{int(only)}", f
     if s == "specprefill" and u is None:
         return "spec", f
     if s == "flexprefill":  # per-layer host-side index selection: not graphable, timed eagerly as released

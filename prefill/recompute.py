@@ -84,14 +84,15 @@ class LookaheadGraph:
     [L, Hkv, T + n_lah, D], attends to it under a mask over keys <= p (same math as the eager slice :p+1) and stores its
     queries in qb [L, H, n_lah + 1, D] at slot p - T + 1. Row T + n_lah - 1 and slot n_lah are scratch for capture."""
 
-    def __init__(self, S, T, n_lah):
+    def __init__(self, S, T, n_lah, capture=True):
         dev, dt = S.embed.device, S.embed.dtype
         self.S, self.T, self.n_lah = S, T, n_lah
         self.kb = torch.zeros(S.n_layers, S.Hkv, T + n_lah, S.D, dtype=dt, device=dev)  # rows > p are masked, but
         self.vb = torch.zeros_like(self.kb)                                               # must not hold NaN patterns
         self.qb = torch.zeros(S.n_layers, S.H, n_lah + 1, S.D, dtype=dt, device=dev)
+        # capture=False: same buffers and math, steps run eagerly (quality runs: no per-prompt capture cost)
         self.g = Graphed(self._step, torch.zeros(1, dtype=torch.long, device=dev),
-                         torch.tensor([T + n_lah - 1], dtype=torch.long, device=dev))
+                         torch.tensor([T + n_lah - 1], dtype=torch.long, device=dev)) if capture else None
 
     def _step(self, tok, p):
         S = self.S
@@ -111,7 +112,84 @@ class LookaheadGraph:
 
     def step(self, tok, p):
         """tok [1] long on the device, p int -> logits [1, V] (graph-owned, overwritten by the next step)."""
-        return self.g(tok, torch.tensor([p], dtype=torch.long, device=tok.device))
+        pt = torch.tensor([p], dtype=torch.long, device=tok.device)
+        return self.g(tok, pt) if self.g is not None else self._step(tok.view(1), pt)
+
+
+@torch.no_grad()
+def small_prefill_into(S, ids, kb, vb, n_q, lo, hi, qb=None, tail=True):
+    """small_prefill_scored that also writes the prompt's K/V into kb/vb[:, :, :T] (e.g. a LookaheadGraph's buffers) and
+    the last token's queries into qb[:, :, 0]. tail=False: no tail-query score (zeros).
+    Returns (hidden states [L+1, T, d], tail score [hi-lo] fp32, last-token logits [1, V])."""
+    T = ids.shape[0]
+    cos, sin = S.cos[:T], S.sin[:T]
+    h = F.embedding(S.ids_in(ids, first=True), S.embed)
+    hs = torch.empty(len(S.layers) + 1, T, h.shape[-1], dtype=h.dtype, device=h.device)
+    hs[0] = h
+    score = torch.zeros(hi - lo, dtype=torch.float32, device=ids.device)
+    qpos = torch.arange(T - n_q, T, device=ids.device)
+    for i, lw in enumerate(S.layers):
+        q, k, v = S._qkv(lw, rms(h, lw["ln1"], S.eps), cos, sin)
+        kb[i, :, :T] = k
+        vb[i, :, :T] = v
+        if qb is not None:
+            qb[i, :, :1] = q[:, -1:]
+        o = F.scaled_dot_product_attention(q[None], k.repeat_interleave(S.rep, 0)[None],
+                                           v.repeat_interleave(S.rep, 0)[None], is_causal=True, scale=S.scaling)[0]
+        if tail:
+            score += attn_mass(q[:, T - n_q:], k, qpos, lo, hi, S.scaling)
+        h = S._mlp(lw, S._out(lw, h, o))
+        hs[i + 1] = h
+    hs[-1] = rms(h, S.norm, S.eps)
+    return hs, score / len(S.layers), F.linear(rms(h[-1:], S.norm, S.eps), S.lm_head)
+
+
+def lookahead(S, lah, logits, T, n_lah, eos):
+    """Greedy draft continuation by the small model (LookaheadGraph lah, prompt K/V already in lah.kb): up to n_lah - 1
+    new tokens at positions T.. (stops after EOS). Returns n = number of query slots filled in lah.qb (slot 0 = last
+    prompt token, slots 1..n-1 = draft tokens)."""
+    n = 1
+    for p in range(T, T + n_lah - 1):
+        nxt = logits.argmax(-1)
+        if int(nxt) in eos:
+            break
+        logits = lah.step(nxt, p)
+        n += 1
+    return n
+
+
+def lah_mass(S, qb, kb, T, n, lo, hi, with_last=False):
+    """Attention mass on buffer rows [lo, hi) of the draft tokens' queries (qb slots 1..n-1, positions T..T+n-2; with
+    with_last also slot 0 = last prompt token), averaged over queries and layers -> [hi-lo] fp32 (zeros if no query)."""
+    a = 0 if with_last else 1
+    score = torch.zeros(hi - lo, dtype=torch.float32, device=kb.device)
+    if n - a <= 0:
+        return score
+    qpos = torch.arange(T - 1 + a, T - 1 + n, device=kb.device)
+    for i in range(S.n_layers):
+        score += attn_mass(qb[i][:, a:n], kb[i][:, :T + n - 1], qpos, lo, hi, S.scaling)
+    return score / S.n_layers
+
+
+def lah_scorer(scorer):
+    """'attn_lah' -> (8 draft queries, with tail), 'attn_lah32' -> (32, with tail), 'attn_lahonly[N]' -> (N or 8, without
+    tail: last prompt token + draft tokens only, the query set SpecPrefill uses)."""
+    only = scorer.startswith("attn_lahonly")
+    rest = scorer[len("attn_lahonly" if only else "attn_lah"):]
+    return (int(rest) if rest else 8), only
+
+
+@torch.no_grad()
+def small_prefill_scored_lah(S, ids, n_q, lo, hi, n_lah, eos, only=False, lah=None):
+    """Our selection score with a draft answer (cf. pseudo-labels in Prefilling-dLLM, look-ahead in SpecPrefill): the
+    attention mass of the last n_q prompt tokens (as attn_small) PLUS that of up to n_lah - 1 greedily drafted answer
+    tokens, both averaged over their queries and the layers. only=True drops the tail term (last prompt token + draft).
+    Returns (hidden states [L+1, T, d], score [hi-lo] fp32)."""
+    T = ids.shape[0]
+    lah = lah or LookaheadGraph(S, T, n_lah, capture=False)
+    hs, score, logits = small_prefill_into(S, ids, lah.kb, lah.vb, n_q, lo, hi, qb=lah.qb, tail=not only)
+    n = lookahead(S, lah, logits, T, n_lah, S.own_eos(eos))
+    return hs, score + lah_mass(S, lah.qb, lah.kb, T, n, lo, hi, with_last=only)
 
 
 @torch.no_grad()
@@ -298,7 +376,8 @@ class RecomputeHybrid(FastHybrid):
     def prefill_sel(self, ids, scorer="attn_big", frac=0.1, needles=None, seg=None, drop=False):
         """ids [T]. Returns (kbuf, vbuf, first-token logits, number of middle tokens recomputed). With drop=True the
         unchosen middle tokens are dropped and kbuf/vbuf hold only sink + chosen + tail (compact)."""
-        assert scorer in SCORERS, scorer
+        assert scorer in SCORERS or scorer.startswith("attn_lah"), scorer
+        lahs = scorer.startswith("attn_lah")  # attn_small + draft-answer queries (small_prefill_scored_lah)
         L, dev = self.L, ids.device
         T = ids.shape[0]
         s, m, t = split_prompt(T, self.n_sink, self.n_tail)
@@ -309,6 +388,10 @@ class RecomputeHybrid(FastHybrid):
         hs = None
         if scorer == "attn_small":
             hs, score = small_prefill_scored(self.S, ids, t, s, s + m)
+            hs = hs[:, s:s + m]
+        elif lahs:
+            n_lah, only = lah_scorer(scorer)
+            hs, score = small_prefill_scored_lah(self.S, ids, t, s, s + m, n_lah, self.eos, only=only)
             hs = hs[:, s:s + m]
         elif scorer == "spec":
             hs, score = spec_importance(self.S, ids, self.n_lah, self.eos, self.spec_kernel, collect=fill,
@@ -326,9 +409,9 @@ class RecomputeHybrid(FastHybrid):
             idx = ar(0, 0)
         elif scorer == "spec" and seg is None:
             idx = choose_units(score, ar(0, m) // self.spec_chunk, k, "mean")
-        elif scorer in ("attn_small", "attn_big", "spec") and seg is not None:
+        elif (scorer in ("attn_small", "attn_big", "spec") or lahs) and seg is not None:
             idx = choose_units(score, segment_ids(ids[s:s + m], seg, self.boundary, self.cap), k)
-        elif scorer in ("attn_small", "attn_big"):
+        elif scorer in ("attn_small", "attn_big") or lahs:
             idx = choose(score, k, self.pool)
         elif scorer == "random":
             idx = torch.randperm(m, generator=self.gen)[:k].sort().values.to(dev)
