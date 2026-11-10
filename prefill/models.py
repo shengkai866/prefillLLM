@@ -6,7 +6,7 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 from .config import HF_CACHE_DIR, LARGE_DIR, LARGE_MAXMEM, SMALL_DIR, TEACHER
 from .projector import Projector
-from .tokalign import load_or_build, same_tokenizer
+from .tokalign import load_or_build, same_tokenizer, shared_vocab
 
 
 def yarn_config(path, factor):
@@ -59,6 +59,11 @@ def load_pair(device, small_dir=SMALL_DIR, large_dir=LARGE_DIR, large_maxmem=LAR
         small.prefill_small_eos = eos_ids(tok_small)
         small.prefill_bos = tok_small.bos_token_id if tok_small.bos_token_id is not None and tok.bos_token_id is None else None
         print(f"[models] cross-tokenizer pair: {name} lookup table ({len(table)} rows), small BOS {small.prefill_bos}", flush=True)
+        if TEACHER == "small":  # cross-family reverse pair: KL over the tokens both vocabularies share
+            li, si = shared_vocab(tok, tok_small)
+            small.teacher_vocab = (torch.from_numpy(li).to(device), torch.from_numpy(si).to(device), large.config.vocab_size)
+            print(f"[models] teacher = small, other vocabulary: KL over {len(li)} shared tokens "
+                  f"({len(li) / len(tok):.1%} of the decoder's, {len(si) / len(tok_small):.1%} of the teacher's)", flush=True)
     return tok, small, large
 
 

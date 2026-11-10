@@ -156,3 +156,23 @@ def load_or_build(tok_large, tok_small, cache_dir, n_rows=None, name=None):
     json.dump(stats, open(path[:-4] + ".json", "w"), indent=1)
     print(f"[tokalign] built {path}: {stats}", flush=True)
     return torch.from_numpy(table)
+
+
+def shared_vocab(tok_large, tok_small):
+    """Tokens both vocabularies share: identical byte strings (both families are byte-level BPE over the GPT-2 byte
+    alphabet, so the vocabulary strings compare directly) plus the chat / special markers paired by role (ROLE_PAIRS).
+    -> (large_ids, small_ids) np.int64, one-to-one. Used for the KL of a cross-family REVERSE pair, where the teacher
+    (the prefilling model, "small" in code) and the decoding model have different vocabularies: both distributions are
+    restricted to these tokens and renormalised (prefill/kv.py teacher_forward / kl_teacher_student)."""
+    vl, vs = tok_large.get_vocab(), tok_small.get_vocab()
+    spec_l = set(tok_large.all_special_tokens) | set(getattr(tok_large, "added_tokens_encoder", {}) or {})
+    spec_s = set(tok_small.all_special_tokens) | set(getattr(tok_small, "added_tokens_encoder", {}) or {})
+    pairs = {vl[t]: vs[t] for t in vl if t in vs and t not in spec_l and t not in spec_s}
+    used = set(pairs.values())
+    for a, b in ROLE_PAIRS:  # chat markers by role, either direction (not _role_map: it pairs the pad tokens)
+        for x, y in ((a, b), (b, a)):
+            if x in vl and y in vs and vl[x] not in pairs and vs[y] not in used:
+                pairs[vl[x]] = vs[y]
+                used.add(vs[y])
+    li = np.array(sorted(pairs), dtype=np.int64)
+    return li, np.array([pairs[i] for i in li], dtype=np.int64)

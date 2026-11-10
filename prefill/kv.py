@@ -186,10 +186,27 @@ def student_forward(large, small, projector, ids, prompt_len, n_sink=8, n_tail=6
 
 @torch.no_grad()
 def teacher_forward(model, ids, prompt_len):
-    """Logits predicting ids[:, prompt_len:] with the model's own full prefill: [B, m, V]."""
+    """Logits predicting ids[:, prompt_len:] with the model's own full prefill: [B, m, V].
+    A teacher from another family (cross-family reverse pair: the prefilling model, with prefill_id_map and
+    teacher_vocab attached by models.load_pair) reads the C2C-mapped sequence, and its logits are moved onto the
+    decoder's vocabulary: shared tokens get the teacher's logit, every other token -inf (kl_teacher_student then
+    renormalises both distributions over the shared tokens)."""
     m = ids.shape[1] - prompt_len
+    table = getattr(model, "prefill_id_map", None)
+    if table is not None:
+        ids = table.to(ids.device)[ids]
+        if getattr(model, "prefill_bos", None) is not None:
+            ids = ids.clone()
+            ids[:, 0] = model.prefill_bos
     out = model(input_ids=ids, use_cache=False, logits_to_keep=m + 1)
-    return out.logits[:, :-1]
+    lg = out.logits[:, :-1]
+    tv = getattr(model, "teacher_vocab", None)
+    if tv is not None:
+        li, si, V = tv
+        full = lg.new_full(lg.shape[:-1] + (V,), float("-inf"))
+        full[..., li.to(lg.device)] = lg[..., si.to(lg.device)]
+        lg = full
+    return lg
 
 
 @torch.no_grad()
@@ -217,6 +234,14 @@ def greedy_decode(model, cache, first_logits, max_new_tokens, eos_ids=(), timing
 
 def kl_teacher_student(t_logits, s_logits):
     """KL(teacher || student) per position, computed in fp32. Inputs [B, m, V]. Returns [B, m]."""
-    t = F.log_softmax(t_logits.float(), -1)
-    s = F.log_softmax(s_logits.float(), -1)
+    t_logits = t_logits.float()
+    s_logits = s_logits.float().to(t_logits.device)
+    keep = torch.isfinite(t_logits[(0,) * (t_logits.dim() - 1)])  # teacher from another vocabulary: shared tokens only
+    if not bool(keep.all()):
+        s_logits = s_logits.masked_fill(~keep, float("-inf"))
+        t = F.log_softmax(t_logits, -1)
+        s = F.log_softmax(s_logits, -1)
+        return torch.where(keep, t.exp() * (t - s), torch.zeros_like(t)).sum(-1)
+    t = F.log_softmax(t_logits, -1)
+    s = F.log_softmax(s_logits, -1)
     return (t.exp() * (t - s)).sum(-1)

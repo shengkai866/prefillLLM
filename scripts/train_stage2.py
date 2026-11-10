@@ -25,6 +25,7 @@ from prefill.data import MixedSampler, TokenStore, save_store  # noqa: E402
 from prefill.kv import kl_teacher_student, split_prompt, student_forward, teacher_forward  # noqa: E402
 from prefill.losses import attention_output_loss  # noqa: E402
 from prefill.models import eos_ids, load_pair, teacher_of  # noqa: E402
+from prefill.xteacher import NativeTeacher, masked_mean  # noqa: E402
 from prefill.projector import Projector  # noqa: E402
 from prefill.trainutil import Logger, cosine_lr, validate_hybrid  # noqa: E402
 
@@ -76,22 +77,25 @@ def load_val_set(name, per_type, max_prompt):
     for i, m in enumerate(meta):
         # identical set for every run (4k bucket only), so validation curves are comparable across runs
         if m.get("bucket", "4k") == "4k" and pl[i] <= max_prompt and cnt.get(m["type"], 0) < per_type:
-            out.append((m["type"], st.get(i), int(pl[i])))
+            out.append((m["type"], st.get(i), int(pl[i]), i))
             cnt[m["type"]] = cnt.get(m["type"], 0) + 1
     print(f"[val] {len(out)} fixed validation sequences: {cnt}")
     return out
 
 
 @torch.no_grad()
-def validate_fixed(large, small, projector, val, n_sink, n_tail, device, teacher=None):
+def validate_fixed(large, small, projector, val, n_sink, n_tail, device, teacher=None, native=None):
     """KL(teacher || hybrid) on the 8B's own held-out responses, per data type and overall (teacher: default large)."""
     projector.eval()
     per = {}
-    for typ, ids, P in val:
+    for typ, ids, P, i in val:
         ids = ids.unsqueeze(0).to(device)
-        t = teacher_forward(teacher if teacher is not None else large, ids, P)
+        if native is not None:  # cross-family reverse pair: the teacher reads its own original sequence
+            t, msk = native.logits(teacher, i, device)
+        else:
+            t, msk = teacher_forward(teacher if teacher is not None else large, ids, P), None
         s = student_forward(large, small, projector, ids, P, n_sink, n_tail)
-        per.setdefault(typ, []).append(kl_teacher_student(t, s).mean().item())
+        per.setdefault(typ, []).append(masked_mean(kl_teacher_student(t, s), msk).item())
     projector.train()
     out = {f"val_kl_{k}": sum(v) / len(v) for k, v in per.items()}
     out["val_kl"] = sum(out.values()) / max(1, len(out))
@@ -153,6 +157,9 @@ def main():
         items = [(k, i) for k, (st, pl) in enumerate(stores) for i in range(len(st)) if pl[i] <= a.max_prompt]
         sd_get = lambda it: stores[it[0]][0].get(it[1])
         sd_plen = lambda it: int(stores[it[0]][1][it[1]])
+        natives = [NativeTeacher.load(n) for n in a.sd.split(",")]  # cross-family reverse pair: teacher's own view
+        if any(x is not None for x in natives):
+            print(f"[sd] teacher reads its own sequences for: {[n for n, x in zip(a.sd.split(','), natives) if x]}")
         print(f"[sd] {a.sd}: {len(items)} sequences with prompt <= {a.max_prompt}")
     else:
         generate_selfdistill(large, tok, train_text, a.n_gen, a.cont_len, a.min_prompt, a.max_prompt, a.gen_batch, device, a.gen_temperature)
@@ -161,9 +168,11 @@ def main():
         items = [(0, i) for i in range(len(sd))]
         sd_get = lambda it: sd.get(it[1])
         sd_plen = lambda it: int(plens[it[1]])
+        natives = [None]
         print(f"[selfdistill] {len(sd)} sequences, generation took {(time.time()-t_start)/60:.1f} min")
     item_plen = np.array([sd_plen(it) for it in items])
     val_fixed = load_val_set(a.val_sd, a.val_per_type, a.max_prompt)
+    val_native = NativeTeacher.load(a.val_sd) if C.TEACHER == "small" else None
 
     projector, ck = Projector.load(a.init, device)
     print(f"[init] {a.init} (stage1 step {ck.get('step')}) ; {projector.num_params()/1e6:.1f}M params")
@@ -195,11 +204,16 @@ def main():
                 h_true = torch.stack([h[:, :P].to(device) for h in out.hidden_states[:Ll]], 0)  # [Ll,1,P,d]
                 del out
                 s_logits, h_hat = student_forward(large, small, projector, ids, P, a.n_sink, a.n_tail, return_hidden=True)
-            else:
-                t_logits = teacher_forward(teacher, ids, P)
+                t_mask = None
+            elif natives[it[0]] is not None:
+                t_logits, t_mask = natives[it[0]].logits(teacher, it[1], device)
                 s_logits = student_forward(large, small, projector, ids, P, a.n_sink, a.n_tail)
                 h_hat = None
-            kl = kl_teacher_student(t_logits, s_logits).mean()
+            else:
+                t_logits, t_mask = teacher_forward(teacher, ids, P), None
+                s_logits = student_forward(large, small, projector, ids, P, a.n_sink, a.n_tail)
+                h_hat = None
+            kl = masked_mean(kl_teacher_student(t_logits, s_logits), t_mask)
             nll = F.cross_entropy(s_logits.float().flatten(0, 1), ids[:, P:].flatten().to(s_logits.device))
             loss = kl + a.lambda_nll * nll
             if h_hat is not None:
@@ -222,7 +236,7 @@ def main():
         hours = (time.time() - t_start) / 3600
         if step % a.val_every == 0:
             if val_fixed:
-                log.log(step=step, **validate_fixed(large, small, projector, val_fixed, a.n_sink, a.n_tail, device, teacher))
+                log.log(step=step, **validate_fixed(large, small, projector, val_fixed, a.n_sink, a.n_tail, device, teacher, val_native))
             else:
                 v = validate_hybrid(large, small, projector, val, a.val_seqs, 2048, 256, a.n_sink, a.n_tail, device, teacher)
                 log.log(step=step, **v)

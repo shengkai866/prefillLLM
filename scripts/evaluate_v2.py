@@ -34,6 +34,7 @@ from prefill import config as C  # noqa: E402
 from prefill.data import TokenStore  # noqa: E402
 from prefill.fast import FastBig, FastHybrid, FastQwen3, FoldedProjectorKV, kv_to_dynamic_cache  # noqa: E402
 from prefill.kv import greedy_decode, kl_teacher_student, teacher_forward, true_prefill  # noqa: E402
+from prefill.xteacher import NativeTeacher  # noqa: E402
 from prefill.mixdata import PromptPool, Tok  # noqa: E402
 from prefill.models import eos_ids, load_pair  # noqa: E402
 from prefill.projector import Projector  # noqa: E402
@@ -127,6 +128,19 @@ def gsm_extract(text):
 TEACHER_CFG = "small" if C.TEACHER == "small" else "big"
 
 
+def teacher_logits(E, st, pl, native, i):
+    """Teacher logits [m, V] for sd_mixtest sequence i + mask of the positions that count ([m] bool, or None).
+    Cross-family reverse pair (native is not None): the teacher reads its own original sequence (prefill/xteacher.py)."""
+    if native is not None:
+        t, msk = native.logits(E.small, i, E.dev)
+        return t[0], msk[0]
+    return E.cont_logits(TEACHER_CFG, st.get(i).to(E.dev), int(pl[i])), None
+
+
+def mmean(x, msk):
+    return (x[msk] if msk is not None else x).float().mean().item()
+
+
 def mean(x):
     return statistics.mean(x) if x else float("nan")
 
@@ -138,6 +152,7 @@ def task_kl(E, cfgs, n_per_cell):
     meta = [json.loads(l) for l in open(os.path.join(C.DATA_DIR, "sd_mixtest", "meta.jsonl"))]
     acc = collections.defaultdict(lambda: {"kl": [], "agree": []})
     cnt = collections.Counter()
+    native = NativeTeacher.load("sd_mixtest") if C.TEACHER == "small" else None
     for i, m in enumerate(meta):
         cell = (m["type"], m["bucket"])
         if cnt[cell] >= n_per_cell:
@@ -145,13 +160,13 @@ def task_kl(E, cfgs, n_per_cell):
         cnt[cell] += 1
         ids = st.get(i).to(E.dev)
         P = int(pl[i])
-        t = E.cont_logits(TEACHER_CFG, ids, P)
+        t, msk = teacher_logits(E, st, pl, native, i)
         for c in cfgs:
             if c == TEACHER_CFG:
                 continue
             s = E.cont_logits(c, ids, P)
-            acc[(c,) + cell]["kl"].append(kl_teacher_student(t[None], s[None]).mean().item())
-            acc[(c,) + cell]["agree"].append((t.argmax(-1) == s.argmax(-1)).float().mean().item())
+            acc[(c,) + cell]["kl"].append(mmean(kl_teacher_student(t[None], s[None])[0], msk))
+            acc[(c,) + cell]["agree"].append(mmean(t.argmax(-1) == s.argmax(-1).to(t.device), msk))
     rows = [{"config": c, "type": t, "bucket": b, "n": len(v["kl"]), "kl": mean(v["kl"]), "top1_agree": mean(v["agree"])}
             for (c, t, b), v in sorted(acc.items())]
     for r in rows:
@@ -267,7 +282,11 @@ def task_curve(E, runs, n_kl, n_ret):
         if m["bucket"] == "4k" and cnt[m["type"]] < n_kl:
             kl_idx.append(i)
             cnt[m["type"]] += 1
-    teacher = {i: E.cont_logits(TEACHER_CFG, st.get(i).to(E.dev), int(pl[i])).cpu() for i in kl_idx}
+    native = NativeTeacher.load("sd_mixtest") if C.TEACHER == "small" else None
+    teacher = {}
+    for i in kl_idx:
+        t, msk = teacher_logits(E, st, pl, native, i)
+        teacher[i] = (t.cpu(), msk)
     ds = load_dataset("simonjegou/ruler", "4096", split="test")
     ret = []
     for t in ("niah_single_2", "niah_multikey_1", "niah_multivalue", "niah_single_3"):
@@ -284,7 +303,7 @@ def task_curve(E, runs, n_kl, n_ret):
             for i in kl_idx:
                 ids = st.get(i).to(E.dev)
                 s = E.cont_logits("_curve", ids, int(pl[i]))
-                kls.append(kl_teacher_student(teacher[i].to(E.dev)[None], s[None]).mean().item())
+                kls.append(mmean(kl_teacher_student(teacher[i][0].to(E.dev)[None], s[None])[0], teacher[i][1]))
             acc = []
             for ids, ans in ret:
                 out = E.generate("_curve", ids, 64).lower()

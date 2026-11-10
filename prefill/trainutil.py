@@ -44,7 +44,9 @@ def validate_hybrid(large, small, projector, sampler, n_seqs, prompt_len, cont_l
         tgt = ids[:, prompt_len:].to(s.device)
         kls.append(kl_teacher_student(t, s).mean().item())
         nll_h.append(torch.nn.functional.cross_entropy(s.float().flatten(0, 1), tgt.flatten()).item())
-        nll_t.append(torch.nn.functional.cross_entropy(t.float().flatten(0, 1), tgt.flatten()).item())
+        tf, tt = t.float().flatten(0, 1), tgt.to(t.device).flatten()
+        ok = torch.isfinite(tf.gather(1, tt[:, None]))[:, 0]  # cross-family teacher: shared target tokens only
+        nll_t.append(torch.nn.functional.cross_entropy(tf[ok], tt[ok]).item() if ok.any() else float("nan"))
         agree.append((t.argmax(-1) == s.argmax(-1)).float().mean().item())
     projector.train()
     f = lambda x: sum(x) / max(1, len(x))

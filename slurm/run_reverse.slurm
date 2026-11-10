@@ -28,8 +28,8 @@ set -o pipefail
 source /nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM/slurm/env.sh
 cd /nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM-reverse || exit 1
 # PAIR (sbatch --export=ALL,PAIR=...): q8to06 (default) | q8to17 (Qwen3-8B -> Qwen3-1.7B) | ll8to1 (Llama-3.1-8B-Instruct ->
-# Llama-3.2-1B-Instruct, Llama data tree whose sd_* answers are the Llama-8B's). Cross-family reverse pairs are not
-# supported: the stage-2 KL needs the teacher (prefilling model) and the decoding model to share a vocabulary.
+# Llama-3.2-1B-Instruct, Llama data tree whose sd_* answers are the Llama-8B's) | xll8toq17 (Llama-3.1-8B -> Qwen3-1.7B)
+# | xq8toll1 (Qwen3-8B -> Llama-3.2-1B): cross-family, see below.
 PAIR=${PAIR:-q8to06}
 M=$PREFILL_ROOT/models
 case $PAIR in
@@ -37,12 +37,21 @@ case $PAIR in
   q8to17) export PREFILL_SMALL_DIR=$M/Qwen3-8B PREFILL_LARGE_DIR=$M/Qwen3-1.7B; TAG=rev8to17 ;;
   ll8to1) source slurm/llama_env.sh
           export PREFILL_SMALL_DIR=$M/Llama-3.1-8B-Instruct PREFILL_LARGE_DIR=$M/Llama-3.2-1B-Instruct; TAG=revll8to1 ;;
+  # cross-family: the decoder keeps its own tokens / pools, the 8B reads the C2C-mapped sequence; stage-2 KL over the
+  # ~110k tokens both vocabularies share (prefill/tokalign.shared_vocab); training data = the 8B's own answers
+  # (its family's sd_* stores) converted to the decoder's tokens and chat template in a data tree of its own
+  xll8toq17) export PREFILL_SMALL_DIR=$M/Llama-3.1-8B-Instruct PREFILL_LARGE_DIR=$M/Qwen3-1.7B; TAG=revll8toq17
+          CROSS=1; BASE=$PREFILL_ROOT/data; SRC=$PREFILL_ROOT/data_llama ;;
+  xq8toll1) export PREFILL_SMALL_DIR=$M/Qwen3-8B PREFILL_LARGE_DIR=$M/Llama-3.2-1B-Instruct; TAG=rev8toll1
+          CROSS=1; BASE=$PREFILL_ROOT/data_llama; SRC=$PREFILL_ROOT/data ;;
   *) echo "unknown PAIR $PAIR"; exit 1 ;;
 esac
 export PREFILL_TEACHER=small
+CROSS=${CROSS:-0}
+[[ $CROSS == 1 ]] && export PREFILL_DATA_DIR=$PREFILL_ROOT/data_$TAG
 export PREFILL_FOLD=eager  # the fused fold kernel is only validated for forward pairs; speed is not measured here
 echo "worktree $(pwd) branch $(git rev-parse --abbrev-ref HEAD) $(git rev-parse --short HEAD); PAIR=$PAIR source $PREFILL_SMALL_DIR -> target $PREFILL_LARGE_DIR, teacher = source, data ${PREFILL_DATA_DIR:-default}"
-START_AT=${START_AT:-smoke}
+START_AT=${START_AT:-$([[ $CROSS == 1 ]] && echo convert || echo smoke)}
 run=0
 step() { echo; echo "==================== [$(date '+%F %T')] $1 ===================="; }
 should() { if [[ $run == 1 || $1 == "$START_AT" ]]; then run=1; return 0; fi; return 1; }
@@ -53,9 +62,17 @@ S2=$CK/${TAG}_mix8k
 P=$S2/projector.pt
 R=results/$TAG
 CFG=big,small,hyb
+[[ $CROSS == 1 ]] && CFG=big,hyb  # the 8B alone is in its own family's results (it cannot decode the decoder's tokens)
 FAILED=""
 ev() { "$@" || { FAILED="$FAILED $1:$3"; echo "!!!!!!!! FAILED: $*"; }; }  # isolated eval step
 
+if [[ $CROSS == 1 ]] && should convert; then
+  step "convert: data tree $PREFILL_DATA_DIR = links into $BASE + the 8B's sd_* stores from $SRC in the decoder's tokens"
+  mkdir -p $PREFILL_DATA_DIR
+  for e in $BASE/*; do n=$(basename $e); case $n in sd_mix4k|sd_mixlong|sd_mixtest) ;; *) [ -e $PREFILL_DATA_DIR/$n ] || ln -s $e $PREFILL_DATA_DIR/$n ;; esac; done
+  [ -e $PREFILL_DATA_DIR/sd_mixtest/meta.jsonl ] || python scripts/convert_sd_cross.py --src_dir $SRC --dst_dir $PREFILL_DATA_DIR \
+    --src_tok $PREFILL_SMALL_DIR --dst_tok $PREFILL_LARGE_DIR || exit 1
+fi
 if should smoke; then
   set -e
   step "smoke: a few GPU training steps and tiny eval runs"
