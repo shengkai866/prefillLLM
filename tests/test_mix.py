@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """Branch proj-drop: recompute + project + drop (RecomputeHybrid.prefill_sel keep=...). On qa_eval prompts:
-keep=1 must match the normal recompute path, keep=0 the drop path (first-token KL and 16-token greedy output);
+keep=1 must match the normal recompute path exactly; keep=0 must match the drop path up to kernel numerics (the drop path
+runs SDPA is_causal on the compact sequence, the mix path the Triton position-causal kernel with compact rows, so a few
+low-confidence first tokens differ slightly: median KL < 1e-3, max < 0.1; a wrong row mapping gives KL >> 1 everywhere);
 keep=0.5 must hold sink + tail + recomputed + ~half of the rest; random mode runs.
   python tests/test_mix.py <projector.pt>"""
 import os
@@ -33,8 +35,8 @@ def main():
     rh = RecomputeHybrid(S, L, build_fold(p, L), n_sink=8, n_tail=64, boundary=boundary)
     eos = eos_ids(tok)
     pool = PromptPool("qa_eval")
-    ok = True
-    for i in (0, 1, 160, 320):
+    ok, kls = True, []
+    for i in (0, 1, 2, 3, 160, 161, 320, 321):
         ids = torch.as_tensor(pool.ids(i), device=dev)
         T = ids.shape[0]
         s, m, t = split_prompt(T, 8, 64)
@@ -55,7 +57,11 @@ def main():
         print(f"[{i}] T={T} m={m} rec={nn}/{n1}/{n0} | KL keep1 vs normal {a:.2e} same={g1 == gn} | KL keep0 vs drop {b:.2e} "
               f"same={g0 == gd} K={k0.shape[2]}/{kd.shape[2]} | keep0.5 projected {half}/{rest} ({half / rest:.2f}) "
               f"random {kr.shape[2] - (s + t + nr)} | outputs: {tok.decode(gn)!r} / {tok.decode(gen(kh, vh, lh))!r} / {tok.decode(gd)!r}", flush=True)
-        ok &= a < 1e-2 and b < 1e-2 and nn == n1 == n0 and k0.shape[2] == kd.shape[2] and 0.4 < half / rest < 0.65
+        kls.append(b)
+        ok &= a < 1e-3 and g1 == gn and b < 0.1 and nn == n1 == n0 and k0.shape[2] == kd.shape[2] and 0.4 < half / rest < 0.65
+    kls.sort()
+    ok &= kls[len(kls) // 2] < 1e-3
+    print(f"keep0 vs drop KL sorted {kls}")
     print("PASSED" if ok else "FAILED")
     sys.exit(0 if ok else 1)
 
