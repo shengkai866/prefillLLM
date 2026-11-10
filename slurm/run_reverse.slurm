@@ -27,19 +27,31 @@
 set -o pipefail
 source /nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM/slurm/env.sh
 cd /nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM-reverse || exit 1
-export PREFILL_SMALL_DIR=$PREFILL_ROOT/models/Qwen3-8B PREFILL_LARGE_DIR=$PREFILL_ROOT/models/Qwen3-0.6B PREFILL_TEACHER=small
+# PAIR (sbatch --export=ALL,PAIR=...): q8to06 (default) | q8to17 (Qwen3-8B -> Qwen3-1.7B) | ll8to1 (Llama-3.1-8B-Instruct ->
+# Llama-3.2-1B-Instruct, Llama data tree whose sd_* answers are the Llama-8B's). Cross-family reverse pairs are not
+# supported: the stage-2 KL needs the teacher (prefilling model) and the decoding model to share a vocabulary.
+PAIR=${PAIR:-q8to06}
+M=$PREFILL_ROOT/models
+case $PAIR in
+  q8to06) export PREFILL_SMALL_DIR=$M/Qwen3-8B PREFILL_LARGE_DIR=$M/Qwen3-0.6B; TAG=rev8to06 ;;
+  q8to17) export PREFILL_SMALL_DIR=$M/Qwen3-8B PREFILL_LARGE_DIR=$M/Qwen3-1.7B; TAG=rev8to17 ;;
+  ll8to1) source slurm/llama_env.sh
+          export PREFILL_SMALL_DIR=$M/Llama-3.1-8B-Instruct PREFILL_LARGE_DIR=$M/Llama-3.2-1B-Instruct; TAG=revll8to1 ;;
+  *) echo "unknown PAIR $PAIR"; exit 1 ;;
+esac
+export PREFILL_TEACHER=small
 export PREFILL_FOLD=eager  # the fused fold kernel is only validated for forward pairs; speed is not measured here
-echo "worktree $(pwd) branch $(git rev-parse --abbrev-ref HEAD) $(git rev-parse --short HEAD); source 8B -> target 0.6B, teacher 8B"
+echo "worktree $(pwd) branch $(git rev-parse --abbrev-ref HEAD) $(git rev-parse --short HEAD); PAIR=$PAIR source $PREFILL_SMALL_DIR -> target $PREFILL_LARGE_DIR, teacher = source, data ${PREFILL_DATA_DIR:-default}"
 START_AT=${START_AT:-smoke}
 run=0
 step() { echo; echo "==================== [$(date '+%F %T')] $1 ===================="; }
 should() { if [[ $run == 1 || $1 == "$START_AT" ]]; then run=1; return 0; fi; return 1; }
 CK=$PREFILL_ROOT/checkpoints
-SM=$CK/rev8to06_smoke
-S1=$CK/rev8to06_stage1
-S2=$CK/rev8to06_mix8k
+SM=$CK/${TAG}_smoke
+S1=$CK/${TAG}_stage1
+S2=$CK/${TAG}_mix8k
 P=$S2/projector.pt
-R=results/rev8to06
+R=results/$TAG
 CFG=big,small,hyb
 FAILED=""
 ev() { "$@" || { FAILED="$FAILED $1:$3"; echo "!!!!!!!! FAILED: $*"; }; }  # isolated eval step
@@ -70,7 +82,7 @@ if should stage2; then
 fi
 if should eval_v2; then
   step "eval: KL vs the 8B per data type (0.6B alone and ours); KL + retrieval at every checkpoint"
-  ev python scripts/evaluate_v2.py --projectors rev8to06=$P --baselines big --tasks kl,curve --curve_runs rev8to06=$S2 --out_dir ${R}_v2
+  ev python scripts/evaluate_v2.py --projectors $TAG=$P --baselines big --tasks kl,curve --curve_runs $TAG=$S2 --out_dir ${R}_v2
 fi
 if should main; then
   step "eval main: NIAH / RULER / QA / GSM8K / code (0.6B alone, 8B alone, 8B prefill -> projector -> 0.6B decode)"
