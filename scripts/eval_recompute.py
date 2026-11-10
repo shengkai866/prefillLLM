@@ -66,13 +66,24 @@ def parse(cfg):
         return cfg, 0.0, None
     s, f, *u = cfg.split(":")
     u = u[0] if u else None
-    return s, float(f.split("m")[0]), (None if u is None else u if u == "sent" or u.startswith("lah") else int(u[1:]))
+    return s, float(f.split("m")[0].split("k")[0]), (None if u is None else u if u == "sent" or u.startswith("lah") else int(u[1:]))
 
 
 def min_tokens(cfg):
     """Floor on the number of recomputed middle tokens: 'attn_small:0.1m512:sent' = 10 %, but at least 512 tokens."""
     f = cfg.split(":")[1] if cfg.count(":") else ""
     return int(f.split("m")[1]) if "m" in f else 0
+
+
+def keep_opt(cfg):
+    """Branch proj-drop: 'attn_small:0.1k0.5:sent' = recompute 10 %, project the next 50 % of the rest (by small-model
+    attention), drop the remainder; 'attn_small:0.1kr0.5:sent' = the projected 50 % are random sentences.
+    -> (keep or None, mode)."""
+    f = cfg.split(":")[1] if cfg.count(":") else ""
+    if "k" not in f:
+        return None, "attn"
+    v = f.split("k")[1]
+    return (float(v[1:]), "random") if v.startswith("r") else (float(v), "attn")
 
 
 def rarecache_opts(s):
@@ -101,6 +112,9 @@ def label(cfg):
         return f"RaReCache 重算整段 {f:.0%}" + ("，强制开头/尾部" if "s" in o else "") + ("，fp32 映射" if "f" in o else "")
     if s.startswith("drop-"):
         return f"丢弃其余（不投影）：{SCORER_ZH[s[5:]]} {f:.0%}" + (f"，{unit_zh(u)}" if u is not None else "")
+    kp, km = keep_opt(cfg)
+    if kp is not None:
+        return f"{SCORER_ZH[s]} 重算 {f:.0%} + 投影其余的 {kp:.0%}（{'随机' if km == 'random' else '按注意力'}）+ 丢弃" + (f"，{unit_zh(u)}" if u is not None else "")
     return f"{SCORER_ZH[s]} {f:.0%}" + (f"（至少 {min_tokens(cfg)} token）" if min_tokens(cfg) else "") + (f"，{unit_zh(u)}" if u is not None else "")
 
 
@@ -150,8 +164,9 @@ class Engine:
         _, m, _ = split_prompt(ids.shape[0], self.rh.n_sink, self.rh.n_tail)
         if min_tokens(cfg):
             f = min(1.0, max(f, min_tokens(cfg) / max(m, 1)))
+        kp, km = keep_opt(cfg)
         kb, vb, lg, n = self.rh.prefill_sel(ids, s.removeprefix("drop-"), f, needles=self.needles(answers) if s == "oracle" else None,
-                                            seg=u, drop=s.startswith("drop-"))
+                                            seg=u, drop=s.startswith("drop-"), keep=kp, keep_mode=km)
         return kb, vb, lg, n / max(m, 1)
 
     @torch.no_grad()

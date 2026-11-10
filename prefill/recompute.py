@@ -24,6 +24,9 @@ Selection unit (`seg`):
               segment score = max token score, whole segments are recomputed
 Block/segment selection takes units in score order until the token budget is reached (the last unit may overshoot).
 
+keep=<f> (branch proj-drop): recompute + project + drop. Of the middle tokens not recomputed, only the share `keep`
+(next in small-model attention order, or random units) gets projected KV; the rest is dropped (compact cache).
+
 drop=True (controlled SpecPrefill-style ablation): same sink / tail / selection, but the middle tokens NOT chosen are
 dropped instead of filled with projected KV; the large model prefills only the kept tokens at their original positions
 and the returned cache is compact (decoding must continue at position T).
@@ -300,9 +303,14 @@ class RecomputeHybrid(FastHybrid):
         return self._lah
 
     @torch.no_grad()
-    def prefill_sel(self, ids, scorer="attn_big", frac=0.1, needles=None, seg=None, drop=False):
+    def prefill_sel(self, ids, scorer="attn_big", frac=0.1, needles=None, seg=None, drop=False, keep=None, keep_mode="attn"):
         """ids [T]. Returns (kbuf, vbuf, first-token logits, number of middle tokens recomputed). With drop=True the
-        unchosen middle tokens are dropped and kbuf/vbuf hold only sink + chosen + tail (compact)."""
+        unchosen middle tokens are dropped and kbuf/vbuf hold only sink + chosen + tail (compact).
+        keep (branch proj-drop, recompute + project + drop): of the middle tokens NOT recomputed, only a fraction `keep`
+        gets projected KV, the rest is dropped (compact cache). keep_mode 'attn': the kept units are the next ones in
+        the same score order (the least attended are dropped); 'random': random units. keep=1 == normal, keep=0 == drop."""
+        if keep is not None:
+            return self._prefill_mix(ids, scorer, frac, seg, keep, keep_mode)
         assert scorer in SCORERS, scorer
         L, dev = self.L, ids.device
         T = ids.shape[0]
@@ -345,6 +353,62 @@ class RecomputeHybrid(FastHybrid):
         if drop:
             return (*prefill_kept(L, ids, pos), int(idx.numel()))
         logits, _ = extend_at(L, ids[pos], pos, kbuf, vbuf)
+        return kbuf, vbuf, logits, int(idx.numel())
+
+    @torch.no_grad()
+    def _prefill_mix(self, ids, scorer, frac, seg, keep, keep_mode):
+        """Three-way split of the middle: recompute (top `frac` units by small-model attention) | project (the next
+        `keep` share of the remaining tokens, or random units) | drop (the rest). Only the kept tokens are folded.
+        Returns compact (kbuf, vbuf, first-token logits, number recomputed); decoding continues at position T."""
+        assert scorer == "attn_small" and seg is not None, "mix configs: attn_small with units"
+        L, dev = self.L, ids.device
+        T = ids.shape[0]
+        s, m, t = split_prompt(T, self.n_sink, self.n_tail)
+        ar = lambda a, b: torch.arange(a, b, device=dev)
+        if m == 0:
+            return (*self.prefill(ids), 0)
+        k = min(m, int(round(frac * m)))
+        hs, score = small_prefill_scored(self.S, ids, t, s, s + m)
+        hs = hs[:, s:s + m]
+        unit = segment_ids(ids[s:s + m], seg, self.boundary, self.cap)
+        idx = choose_units(score, unit, k) if k > 0 else ar(0, 0)
+        chosen = torch.zeros(m, dtype=torch.bool, device=dev)
+        chosen[idx] = True
+        rest = int(m - idx.numel())
+        nk = int(round(keep * rest))
+        if nk >= rest:
+            pidx = torch.nonzero(~chosen).flatten()
+        elif nk <= 0:
+            pidx = ar(0, 0)
+        else:
+            nu = int(unit.max()) + 1
+            if keep_mode == "random":
+                us = torch.rand(nu, generator=self.gen).to(dev)
+            else:
+                us = torch.zeros(nu, device=dev).scatter_reduce(0, unit, score, "amax", include_self=False)
+            ul = torch.bincount(unit, minlength=nu)
+            uch = torch.zeros(nu, dtype=torch.bool, device=dev)
+            uch[unit[idx]] = True  # recomputed units are not candidates
+            order = torch.argsort(us, descending=True)
+            order = order[~uch[order]]
+            before = torch.cumsum(ul[order], 0) - ul[order]
+            kp = torch.zeros(nu, dtype=torch.bool, device=dev)
+            kp[order[before < nk]] = True
+            pidx = torch.nonzero(kp[unit] & ~chosen).flatten()
+        q = torch.cat([ar(0, s), s + idx, ar(s + m, T)])  # computed by the large model
+        allpos = torch.cat([q, s + pidx]).sort().values    # positions held by the compact cache
+        K = allpos.shape[0]
+        kbuf = torch.zeros(L.n_layers, L.Hkv, K, L.D, dtype=L.embed.dtype, device=dev)
+        vbuf = torch.zeros_like(kbuf)
+        if pidx.numel():
+            kt = torch.empty(L.n_layers, L.Hkv, pidx.numel(), L.D, dtype=L.embed.dtype, device=dev)
+            vt = torch.empty_like(kt)
+            pp = s + pidx
+            self.fold(hs[:, pidx].contiguous(), L.cos[pp].contiguous(), L.sin[pp].contiguous(), kt, vt)
+            rp = torch.searchsorted(allpos, pp)
+            kbuf.index_copy_(2, rp, kt)
+            vbuf.index_copy_(2, rp, vt)
+        logits, _ = extend_at(L, ids[q], q, kbuf, vbuf, rows=torch.searchsorted(allpos, q))
         return kbuf, vbuf, logits, int(idx.numel())
 
     @torch.no_grad()
