@@ -25,7 +25,7 @@ from prefill.data import MixedSampler, TokenStore, save_store  # noqa: E402
 from prefill.kv import kl_teacher_student, split_prompt, student_forward, teacher_forward  # noqa: E402
 from prefill.losses import attention_output_loss  # noqa: E402
 from prefill.models import eos_ids, load_pair  # noqa: E402
-from prefill.projector import Projector  # noqa: E402
+from prefill.projector import Projector, ProjectorWide  # noqa: E402
 from prefill.trainutil import Logger, cosine_lr, validate_hybrid  # noqa: E402
 
 
@@ -131,6 +131,9 @@ def main():
     ap.add_argument("--save_step_every", type=int, default=2000, help="also keep projector_step<N>.pt every N steps")
     ap.add_argument("--start_step", type=int, default=0, help="resume an interrupted run: --init its projector.pt, continue "
                     "LR schedule and curriculum from this step (optimizer state is not saved, so the LR re-ramps over --warmup)")
+    ap.add_argument("--widen", default="", choices=["", "w2", "w2w1"], help="convert the --init Projector to ProjectorWide "
+                    "(exact, same outputs) before training: w2 = full per-layer W2; w2w1 = also W1 per --w1_groups layer groups")
+    ap.add_argument("--w1_groups", type=int, default=0, help="--widen w2w1: number of W1 groups (0 = one per large layer)")
     a = ap.parse_args()
 
     torch.manual_seed(a.seed + a.start_step)
@@ -163,6 +166,10 @@ def main():
 
     projector, ck = Projector.load(a.init, device)
     print(f"[init] {a.init} (stage1 step {ck.get('step')}) ; {projector.num_params()/1e6:.1f}M params")
+    if a.widen:
+        g = 1 if a.widen == "w2" else (a.w1_groups or projector.cfg["Ll"])
+        projector = ProjectorWide.from_projector(projector, w1_groups=g).to(device)
+        print(f"[widen] {a.widen}: ProjectorWide(w1_groups={g}), {projector.num_params()/1e6:.1f}M params")
     projector.train()
     opt = torch.optim.AdamW(projector.parameters(), lr=a.lr, betas=(0.9, 0.95), weight_decay=0.01)
 

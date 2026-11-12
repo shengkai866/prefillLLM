@@ -303,13 +303,6 @@ class FusedFoldKV(FoldedProjectorKV):
 
     fuse_mix = True
 
-    def activations_eager(self, hs):
-        """a_l = silu(W1 · mix_l(h) + b1) for all layers: [Ll, n, d_mid] (same as the eager path)."""
-        hc = rms_unit(hs) if self.in_norm else hs
-        H1 = F.linear(hc, self.W1)  # [Ls, n, d_mid]
-        Ll, n = self.mix.shape[0], hs.shape[1]
-        return F.silu(torch.matmul(self.mix, H1.reshape(H1.shape[0], -1)).view(Ll, n, -1) + self.b1)
-
     def row_rms(self, hs, eps=1e-6):
         """[Ls, n] fp32: 1 / rms over d_s of every token of every small layer (= prefill.projector.rms_unit's scale)."""
         Ls, n, d_s = hs.shape
@@ -336,7 +329,7 @@ class FusedFoldKV(FoldedProjectorKV):
     def activations(self, hs):
         """Same math as activations_eager: W1 applied to the raw hidden states (bf16 GEMM, no fp32 copy), the input
         normalisation as a per-token scale folded into the layer mix, and mix + bias + silu in one Triton pass."""
-        if not self.fuse_mix:
+        if not self.fuse_mix or self.grouped:  # per-layer W1 (ProjectorWide w1_groups > 1): eager mix + batched GEMM
             return self.activations_eager(hs)
         H1 = F.linear(hs, self.W1).contiguous()  # [Ls, n, d_mid]
         return self.mix_silu(H1, self.row_rms(hs) if self.in_norm else None)

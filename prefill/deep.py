@@ -65,10 +65,7 @@ class DeepHybrid(FastHybrid):
             p, dev, dt = self.p, self.L.embed.device, self.L.embed.dtype
             f64 = lambda t: t.detach().to(device=dev, dtype=torch.float64)
             with torch.no_grad():
-                W2T, b2 = f64(p.trunk[2].weight).T, f64(p.trunk[2].bias)
-                Dl, Ul = f64(p.down[l]), f64(p.up[l])
-                M = W2T + (W2T @ Dl) @ Ul
-                c = b2 + (b2 @ Dl) @ Ul + f64(p.bias[l].reshape(-1))
+                M, c = (f64(t) for t in p.layer_affine(l))
             self._resid[l] = (M.to(dt), c.to(dt))
         return self._resid[l]
 
@@ -76,6 +73,7 @@ class DeepHybrid(FastHybrid):
         """Projector's predicted input residual stream of large layer l for the middle tokens: [n, d_l]."""
         fo = self.fold
         M, c = self.resid_map(l)
+        assert not fo.grouped, "prefill_deep supports w1_groups = 1 only"
         a = F.silu(torch.einsum("s,snd->nd", fo.mix[l], F.linear(hs_mid, fo.W1)) + fo.b1)
         return torch.addmm(c, a, M)
 

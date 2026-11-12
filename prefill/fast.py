@@ -218,17 +218,19 @@ class FoldedProjectorKV:
         with torch.no_grad():
             self.in_norm = bool(p.cfg.get("in_norm"))
             self.mix = p.layer_mix.detach().float().softmax(-1).to(dev).to(dt)  # [Ll, Ls]
-            self.W1 = p.trunk[0].weight.detach().to(dev, dt)
-            self.b1 = p.trunk[0].bias.detach().to(dev, dt)
-            W2T, b2 = f64(p.trunk[2].weight).T, f64(p.trunk[2].bias)  # [d_mid, d_l], [d_l]
-            d_mid = W2T.shape[0]
+            W1, b1, gidx = p.first_stage()  # [G, d_mid, d_s], [G, d_mid], [Ll]
+            self.grouped = W1.shape[0] > 1  # ProjectorWide with w1_groups > 1: mix the layers first, then per-layer W1
+            if self.grouped:
+                gidx = gidx.to(dev)
+                self.W1l = W1.detach().to(dev, dt)[gidx]  # [Ll, d_mid, d_s]
+                self.b1l = b1.detach().to(dev, dt)[gidx][:, None, :]  # [Ll, 1, d_mid]
+            self.W1, self.b1 = W1[0].detach().to(dev, dt), b1[0].detach().to(dev, dt)  # G = 1 path (and shapes)
+            d_mid = W1.shape[1]
             ncol = 2 * self.KV + d_mid + 1
             ncol_pad = (ncol + 127) // 128 * 128  # zero columns add nothing to the sum of squares
             Wc, bc = [], []
             for l, lw in enumerate(lf.layers):
-                Dl, Ul = f64(p.down[l]), f64(p.up[l])
-                M = W2T + (W2T @ Dl) @ Ul
-                c = b2 + (b2 @ Dl) @ Ul + f64(p.bias[l].reshape(-1))
+                M, c = (f64(t) for t in p.layer_affine(l))  # x_l = a_l M + c
                 wk = f64(lw["wqkv"][lf.H * lf.D: lf.H * lf.D + self.KV])
                 wv = f64(lw["wqkv"][lf.H * lf.D + self.KV:])
                 ln = f64(lw["ln1"])
@@ -251,6 +253,16 @@ class FoldedProjectorKV:
             self.kn = None if lf.layers[0]["kn"] is None else \
                 torch.stack([lw["kn"] for lw in lf.layers])[:, None, None, :]  # [Ll,1,1,D]; None for Llama
 
+    def activations_eager(self, hs):
+        """a_l = silu(W1 · mix_l(h) + b1) for all layers: [Ll, n, d_mid]."""
+        hc = rms_unit(hs) if self.in_norm else hs
+        Ll, n = self.mix.shape[0], hs.shape[1]
+        if self.grouped:  # per-layer W1: mix the small layers first, then one batched GEMM
+            mixed = torch.matmul(self.mix, hc.reshape(hc.shape[0], -1)).view(Ll, n, -1)
+            return F.silu(torch.baddbmm(self.b1l, mixed, self.W1l.transpose(1, 2)))
+        H1 = F.linear(hc, self.W1)  # [Ls, n, d_mid]; mixing commutes with W1 (rows of mix sum to 1)
+        return F.silu(torch.matmul(self.mix, H1.reshape(H1.shape[0], -1)).view(Ll, n, -1) + self.b1)
+
     def __call__(self, hs, cos, sin, kdst, vdst, n_layers=None):
         """hs [Ls, n, d_s] small-model hidden states of the middle tokens; cos/sin [n, D]; writes kdst/vdst [Ll,Hkv,n,D].
         n_layers: only the first n_layers large layers (kdst/vdst then have n_layers rows)."""
@@ -259,9 +271,7 @@ class FoldedProjectorKV:
         for c0 in range(0, n, self.chunk):
             c1 = min(n, c0 + self.chunk)
             nc = c1 - c0
-            hc = rms_unit(hs[:, c0:c1]) if self.in_norm else hs[:, c0:c1]
-            H1 = F.linear(hc, self.W1)  # [Ls, nc, d_mid]; mixing commutes with W1 (rows of mix sum to 1)
-            a = F.silu(torch.matmul(self.mix[:Ll], H1.reshape(H1.shape[0], -1)).view(Ll, nc, -1) + self.b1)
+            a = self.activations_eager(hs[:, c0:c1])[:Ll]
             Y = torch.baddbmm(self.bcat[:Ll], a, self.Wcat[:Ll])  # [Ll, nc, ncol_pad]
             inv = torch.rsqrt(Y[..., 2 * self.KV:].float().pow(2).sum(-1, keepdim=True) / self.d_l + self.eps)
             k = (Y[..., :self.KV].float() * inv).to(self.dt).view(Ll, nc, self.Hkv, self.D)
