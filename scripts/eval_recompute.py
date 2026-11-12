@@ -47,6 +47,7 @@ from prefill.graphs import build as build_graphs  # noqa: E402
 from prefill.kv import greedy_decode, split_prompt, true_prefill  # noqa: E402
 from prefill.mixdata import PromptPool, Tok  # noqa: E402
 from prefill.models import eos_ids, load_pair  # noqa: E402
+from prefill.c2c import c2c_prefill, cache_to_bufs  # noqa: E402
 from prefill.projector import Projector  # noqa: E402
 from prefill.rarecache import RaReCache  # noqa: E402
 from prefill.recompute import RecomputeHybrid, choose_units, extend_at, segment_ids, small_prefill_scored  # noqa: E402
@@ -106,11 +107,12 @@ class Engine:
         p, ck = Projector.load(proj_path, dev)
         p.eval()
         self.proj_step = ck.get("step")
+        self.c2c = p if getattr(p, "is_c2c", False) else None  # C2C fuser: config "hyb" = C2C fusion (prefill/c2c.py)
         # sentence/line boundary tokens for 'sent' units
         boundary = torch.tensor([any(ch in tok.decode([i]) for ch in ".!?\n") for i in range(len(tok))], device=dev)
         self.eos = eos_ids(tok)
-        self.rh = RecomputeHybrid(self.S, self.L, build_fold(p, self.L), n_sink=n_sink, n_tail=n_tail, boundary=boundary,
-                                  eos=self.eos)
+        self.rh = None if self.c2c else RecomputeHybrid(self.S, self.L, build_fold(p, self.L), n_sink=n_sink, n_tail=n_tail,
+                                                        boundary=boundary, eos=self.eos)
         self.rc = RaReCache(self.S, self.L, torch.load(rarecache_fit, map_location="cpu")) if rarecache_fit else None
 
     def needles(self, answers):
@@ -130,6 +132,11 @@ class Engine:
             return (*self.fb.prefill(ids), 1.0)
         if s == "small":  # small model alone: its own prefill (lean path); decoding is handled in generate()
             return None, None, self.S.prefill(ids)[0], 0.0
+        if s == "hyb" and self.c2c is not None:
+            cache, lg = c2c_prefill(self.large, self.small, self.c2c, ids)
+            return (*cache_to_bufs(cache), lg, 0.0)
+        if self.rh is None:
+            raise SystemExit(f"config {cfg} needs a hidden-state projector, not a C2C fuser")
         if s == "hyb":
             return (*self.rh.prefill(ids), 0.0)
         if s == "specprefill":

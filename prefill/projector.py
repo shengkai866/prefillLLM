@@ -55,7 +55,15 @@ class Projector(nn.Module):
 
     @classmethod
     def load(cls, path, device="cpu"):
+        """Also loads a C2C fuser (prefill/c2c.py): a checkpoint with kind == "c2c", or a C2C SFT_train.py directory."""
+        import os
+        if os.path.isdir(path):
+            from .c2c import C2CFuser
+            return C2CFuser.load(path, device)
         ckpt = torch.load(path, map_location="cpu", weights_only=False)
+        if ckpt.get("kind") == "c2c":
+            from .c2c import C2CFuser
+            return C2CFuser.load(path, device)
         m = cls(**ckpt["cfg"])
         m.load_state_dict(ckpt["state_dict"])
         return m.to(device), ckpt

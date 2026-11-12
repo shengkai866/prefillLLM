@@ -104,7 +104,10 @@ def validate_fixed(large, small, projector, val, n_sink, n_tail, device, teacher
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--init", default=os.path.join(C.CKPT_DIR, "stage1", "projector.pt"))
+    ap.add_argument("--init", default=os.path.join(C.CKPT_DIR, "stage1", "projector.pt"),
+                    help="projector checkpoint, or 'c2c' for a fresh Cache-to-Cache fuser (prefill/c2c.py; no stage 1)")
+    ap.add_argument("--c2c_anneal", type=int, default=0, help="C2C gate-temperature annealing steps (0 = max_steps)")
+    ap.add_argument("--wd", type=float, default=0.01)
     ap.add_argument("--out_dir", default=os.path.join(C.CKPT_DIR, "stage2"))
     ap.add_argument("--sources", default="fineweb_edu,slimpajama")
     ap.add_argument("--n_gen", type=int, default=2400)
@@ -174,10 +177,17 @@ def main():
     val_fixed = load_val_set(a.val_sd, a.val_per_type, a.max_prompt)
     val_native = NativeTeacher.load(a.val_sd) if C.TEACHER == "small" else None
 
-    projector, ck = Projector.load(a.init, device)
-    print(f"[init] {a.init} (stage1 step {ck.get('step')}) ; {projector.num_params()/1e6:.1f}M params")
+    if a.init == "c2c":
+        from prefill.c2c import C2CFuser
+        projector, ck = C2CFuser.new(small, large, anneal_steps=a.c2c_anneal or a.max_steps).to(device), {}
+        print(f"[init] fresh C2C fuser, source {C.SMALL_NAME} layer l+{projector.offset} -> decoder {C.LARGE_NAME} layer l; "
+              f"{projector.num_params()/1e6:.1f}M params, gate annealing over {projector.cfg['hp']['anneal_steps']} steps")
+    else:
+        projector, ck = Projector.load(a.init, device)
+        print(f"[init] {a.init} (stage1 step {ck.get('step')}) ; {projector.num_params()/1e6:.1f}M params")
+    is_c2c = getattr(projector, "is_c2c", False)
     projector.train()
-    opt = torch.optim.AdamW(projector.parameters(), lr=a.lr, betas=(0.9, 0.95), weight_decay=0.01)
+    opt = torch.optim.AdamW(projector.parameters(), lr=a.lr, betas=(0.9, 0.95), weight_decay=a.wd)
 
     if a.start_step and ck.get("step") != a.start_step:
         print(f"[warn] --start_step {a.start_step} but {a.init} was saved at step {ck.get('step')}")
@@ -188,6 +198,8 @@ def main():
             lr *= min(1.0, (step - a.start_step + 1) / max(1, a.warmup))
         for g in opt.param_groups:
             g["lr"] = lr
+        if is_c2c:
+            projector.update_temperature(step)
         frac = min(1.0, step / max(1, a.curriculum_frac * a.max_steps))
         cur_max = int(512 + (a.max_prompt - 512) * frac)
         stats = {}
@@ -235,11 +247,17 @@ def main():
             log.log(step=step, lr=lr, grad_norm=gn, cur_max_prompt=cur_max, **stats)
         hours = (time.time() - t_start) / 3600
         if step % a.val_every == 0:
+            projector.eval()  # C2C: hard gates, no dropout (as at inference)
+            if is_c2c:
+                g = projector.gate_logits()
+                log.log(step=step, gates_open_k=sum(k > 0 for k, _ in g), gates_open_v=sum(v > 0 for _, v in g),
+                        gate_temp=float(projector.projs[0].gate_temperature))
             if val_fixed:
                 log.log(step=step, **validate_fixed(large, small, projector, val_fixed, a.n_sink, a.n_tail, device, teacher, val_native))
             else:
                 v = validate_hybrid(large, small, projector, val, a.val_seqs, 2048, 256, a.n_sink, a.n_tail, device, teacher)
                 log.log(step=step, **v)
+            projector.train()
         if step % a.save_every == 0 or step == a.max_steps or hours > a.time_budget_hours:
             projector.save(os.path.join(a.out_dir, "projector.pt"), step=step, args=vars(a))
             print(f"[ckpt] step {step} saved ({hours:.2f}h)", flush=True)

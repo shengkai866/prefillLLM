@@ -41,6 +41,17 @@ from prefill.projector import Projector  # noqa: E402
 
 
 # ----------------------------------------------------------------------------------------------- engine
+class _C2CPrefiller:
+    def __init__(self, dec, src, fuser):
+        self.dec, self.src, self.fuser = dec, src, fuser
+
+    @torch.no_grad()
+    def prefill(self, ids):
+        from prefill.c2c import c2c_prefill, cache_to_bufs
+        cache, lg = c2c_prefill(self.dec, self.src, self.fuser, ids)
+        return (*cache_to_bufs(cache), lg)
+
+
 class Engine:
     def __init__(self, tok, small, large, dev, n_sink, n_tail):
         self.tok, self.small, self.large, self.dev = tok, small, large, dev
@@ -54,6 +65,9 @@ class Engine:
     def add_projector(self, tag, path):
         p, ck = Projector.load(path, self.dev)
         p.eval()
+        if getattr(p, "is_c2c", False):  # C2C fuser (prefill/c2c.py): same (kbuf, vbuf, logits) interface
+            self.hyb[tag] = (p, _C2CPrefiller(self.large, self.small, p))
+            return ck.get("step")
         self.hyb[tag] = (p, FastHybrid(self.S, self.L, FoldedProjectorKV(p, self.L), self.n_sink, self.n_tail))
         return ck.get("step")
 

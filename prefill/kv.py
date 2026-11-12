@@ -163,6 +163,11 @@ def student_forward(large, small, projector, ids, prompt_len, n_sink=8, n_tail=6
     Tail tokens and continuation are run through the large model in a single forward.
     return_hidden: also return the projected middle residual streams h_hat [Ll, B, n_mid, d_l] (None if no middle).
     """
+    if getattr(projector, "is_c2c", False):  # C2C fuser (prefill/c2c.py): `small` = source, `large` = decoder
+        from .c2c import c2c_student_forward
+        if return_hidden:
+            raise ValueError("return_hidden is not defined for a C2C fuser")
+        return c2c_student_forward(large, small, projector, ids, prompt_len)
     B, T = ids.shape
     m = T - prompt_len
     n_sink, n_mid, n_tail = split_prompt(prompt_len, n_sink, n_tail)
