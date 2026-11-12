@@ -134,6 +134,10 @@ def main():
     ap.add_argument("--widen", default="", choices=["", "w2", "w2w1"], help="convert the --init Projector to ProjectorWide "
                     "(exact, same outputs) before training: w2 = full per-layer W2; w2w1 = also W1 per --w1_groups layer groups")
     ap.add_argument("--w1_groups", type=int, default=0, help="--widen w2w1: number of W1 groups (0 = one per large layer)")
+    ap.add_argument("--proj_ckpt", action="store_true", help="ProjectorWide: activation checkpointing of the projector "
+                    "(same numbers, less memory: the full per-layer W2 / W1 + AdamW states do not fit an L40S at 8k otherwise)")
+    ap.add_argument("--probe_longest", action="store_true", help="memory probe: every micro-step uses one of the longest "
+                    "sequences; run with a small --max_steps before a long job to fail fast on OOM")
     a = ap.parse_args()
 
     torch.manual_seed(a.seed + a.start_step)
@@ -170,6 +174,7 @@ def main():
         g = 1 if a.widen == "w2" else (a.w1_groups or projector.cfg["Ll"])
         projector = ProjectorWide.from_projector(projector, w1_groups=g).to(device)
         print(f"[widen] {a.widen}: ProjectorWide(w1_groups={g}), {projector.num_params()/1e6:.1f}M params")
+        projector.grad_ckpt = a.proj_ckpt
     projector.train()
     opt = torch.optim.AdamW(projector.parameters(), lr=a.lr, betas=(0.9, 0.95), weight_decay=0.01)
 
@@ -187,6 +192,8 @@ def main():
         stats = {}
         for _ in range(a.accum):
             ok = np.nonzero(item_plen <= cur_max)[0]
+            if a.probe_longest:
+                ok = np.argsort(-item_plen)[:16]
             it = items[int(ok[random.randrange(len(ok))])] if len(ok) else items[random.randrange(len(items))]
             ids = sd_get(it).unsqueeze(0).to(device)
             P = sd_plen(it)
@@ -220,8 +227,9 @@ def main():
         opt.step()
         opt.zero_grad(set_to_none=True)
         step += 1
-        if step % 10 == 0 or step == 1:
-            log.log(step=step, lr=lr, grad_norm=gn, cur_max_prompt=cur_max, **stats)
+        if step % 10 == 0 or step == 1 or step == a.max_steps:
+            mem = torch.cuda.max_memory_allocated() / 2**30 if device.type == "cuda" else 0.0
+            log.log(step=step, lr=lr, grad_norm=gn, cur_max_prompt=cur_max, peak_gib=round(mem, 2), **stats)
         hours = (time.time() - t_start) / 3600
         if step % a.val_every == 0:
             if val_fixed:

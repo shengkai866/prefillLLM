@@ -17,7 +17,7 @@
 #   1. capacity that is free at inference (prefill/projector.ProjectorWide), continued from r2_mix8k, 6000 steps each,
 #      same data order / LR for all three: ctrl (original structure) | w2 (full per-layer W2) | w2w1 (+ per-layer W1)
 #      each evaluated with hyb and attn_small:0.1:sent on KL / RULER / QA; r2_mix8k itself evaluated the same way
-# START_AT=<stage> resumes (stages below in order).
+# START_AT=<stage> resumes (stages below in order). Re-run after the OOM: START_AT=probe (ctrl results kept).
 set -o pipefail
 source /nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM/slurm/env.sh
 cd /nfs/turbo/umms-drjieliu/usr/shengkai/prefillLLM-pcap || exit 1
@@ -26,6 +26,7 @@ START_AT=${START_AT:-smoke}
 run=0
 step() { echo; echo "==================== [$(date '+%F %T')] $1 ===================="; }
 should() { if [[ $run == 1 || $1 == "$START_AT" ]]; then run=1; return 0; fi; return 1; }
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 CK=$PREFILL_ROOT/checkpoints
 BASE=$CK/r2_mix8k/projector.pt
 SM=$CK/pcap_smoke
@@ -61,10 +62,24 @@ if should eval_base; then
   step "eval r2_mix8k as is (reference for the continued runs)"
   ev python scripts/diag_projector.py --projector $BASE --out_dir results/pcap_base $EVAL
 fi
+if should probe; then
+  # job 28149423: train_w2 / train_w2w1 OOM'd on the L40S within 30 steps (ctrl ran fine): +218M / +292M fp32 params with
+  # grads + AdamW states, and the wide forward kept an fp32 [36, T, 2048] activation. Fixed by --proj_ckpt (projector
+  # recomputed in backward; identical numbers) + bf16 activations; this stage fails the job in minutes if it still OOMs.
+  step "memory probe: w2w1 (largest) with --proj_ckpt on the longest sequences"
+  set -e
+  python scripts/train_stage2.py $COMMON --widen w2w1 --proj_ckpt --probe_longest --max_steps 3 --accum 1 --val_every 1000 \
+    --save_every 1000 --out_dir $CK/pcap_probe
+  grep -h peak_gib $CK/pcap_probe/train_log.jsonl | tail -1
+  set +e
+fi
 for V in ctrl w2 w2w1; do
+  if [[ -f results/pcap_$V/summary.md && $START_AT != train_$V && $START_AT != eval_$V ]]; then
+    should train_$V; echo "[skip] $V: results/pcap_$V/summary.md exists"; continue
+  fi
   if should train_$V; then
     step "train $V: 6000 more steps from r2_mix8k"
-    W=""; [[ $V != ctrl ]] && W="--widen $V"
+    W=""; [[ $V != ctrl ]] && W="--widen $V --proj_ckpt"
     ev python scripts/train_stage2.py $COMMON $W --out_dir $CK/pcap_$V
   fi
   if should eval_$V; then

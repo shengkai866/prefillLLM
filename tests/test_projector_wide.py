@@ -132,5 +132,16 @@ for name in ("W1", "b1", "W2", "b2", "layer_mix"):
     gsum = getattr(w, name).grad.abs().sum().item()
     assert gsum > 0, name
 print("[4] gradients reach W1, b1, W2, b2, layer_mix")
+# 5. activation checkpointing (train_stage2 --proj_ckpt) gives the same output and gradients
+w.train()
+g0 = {n: q.grad.clone() for n, q in w.named_parameters()}
+w.grad_ckpt = True
+w.zero_grad()
+out_ck = w(hs)
+out_ck.pow(2).mean().backward()
+w.grad_ckpt = False
+e = max(rel(q.grad, g0[n]) for n, q in w.named_parameters())
+print(f"[5] grad_ckpt: output rel diff {rel(out_ck.detach(), w(hs).detach()):.2e}, max grad rel diff {e:.2e}")
+assert e < 1e-10, e
 print(f"params: Projector {p.num_params()}, ProjectorWide(w1_groups={Ll}) {w.num_params()}")
 print("ALL OK")

@@ -116,17 +116,26 @@ class ProjectorWide(nn.Module):
             m.b2[l].copy_(cl.to(m.b2.dtype))
         return m
 
+    grad_ckpt = False  # train-time: recompute the projector in backward instead of storing its [Ll,T,d_mid] activations
+
     def forward(self, hs_small):  # [Ls, B, T, d_s] -> [Ll, B, T, d_l]
+        if self.grad_ckpt and self.training and torch.is_grad_enabled():
+            return torch.utils.checkpoint.checkpoint(self._forward, hs_small, use_reentrant=False)
+        return self._forward(hs_small)
+
+    def _forward(self, hs_small):
         if self.cfg.get("in_norm"):
             hs_small = rms_unit(hs_small)
         hs_small = hs_small.to(self.W1.dtype)
         w = self.layer_mix.softmax(-1)
         if self.cfg["w1_groups"] == 1:  # W1 is linear: apply it before mixing (Ls instead of Ll GEMMs)
             H1 = torch.einsum("sbtd,md->sbtm", hs_small, self.W1[0])
-            a = torch.einsum("ls,sbtm->lbtm", w.to(H1.dtype), H1) + self.b1[0]
+            a = torch.einsum("ls,sbtm->lbtm", w.to(H1.dtype), H1)
+            a = a + self.b1[0].to(a.dtype)
         else:
             mixed = torch.einsum("ls,sbtd->lbtd", w.to(hs_small.dtype), hs_small)
-            a = torch.einsum("lbtd,lmd->lbtm", mixed, self.W1[self.gidx]) + self.b1[self.gidx][:, None, None]
+            a = torch.einsum("lbtd,lmd->lbtm", mixed, self.W1[self.gidx])
+            a = a + self.b1[self.gidx][:, None, None].to(a.dtype)
         a = F.silu(a)
         return torch.einsum("lbtm,lme->lbte", a, self.W2.to(a.dtype)) + self.b2[:, None, None].to(a.dtype)
 
