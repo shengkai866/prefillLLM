@@ -30,7 +30,7 @@ def small_hidden_states(small, input_ids):
             input_ids = input_ids.clone()
             input_ids[:, 0] = small.prefill_bos
     out = small.model(input_ids=input_ids, output_hidden_states=True, use_cache=False)
-    return torch.stack(out.hidden_states, 0)
+    return torch.stack([h.to(input_ids.device) for h in out.hidden_states], 0)  # layers may sit on several GPUs
 
 
 def large_hidden_states(large, input_ids):

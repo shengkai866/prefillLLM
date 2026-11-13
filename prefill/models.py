@@ -4,7 +4,7 @@ import os
 import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
-from .config import HF_CACHE_DIR, LARGE_DIR, LARGE_MAXMEM, SMALL_DIR, TEACHER
+from .config import HF_CACHE_DIR, LARGE_DIR, LARGE_MAXMEM, SMALL_DIR, SMALL_MAXMEM, TEACHER
 from .projector import Projector
 from .tokalign import load_or_build, same_tokenizer, shared_vocab
 
@@ -31,7 +31,16 @@ def load_frozen(path, device, dtype=torch.bfloat16, yarn=None):
     cfg = yarn_config(path, yarn)
     m = AutoModelForCausalLM.from_pretrained(path, torch_dtype=dtype, attn_implementation="sdpa", config=cfg)
     m.eval().requires_grad_(False)
+    patch_moe(m)
     return m.to(device)
+
+
+def patch_moe(m):
+    """Qwen3-MoE (e.g. Qwen3-30B-A3B): replace HF's per-expert loop (128 host syncs per layer) with prefill/moe.py's
+    grouped version (one sync per layer, same per-expert math). No-op for dense models."""
+    if getattr(m.config, "model_type", "") == "qwen3_moe":
+        from .moe import patch_qwen3_moe
+        patch_qwen3_moe()
 
 
 def load_split(path, maxmem, dtype=torch.bfloat16, yarn=None):
@@ -40,16 +49,17 @@ def load_split(path, maxmem, dtype=torch.bfloat16, yarn=None):
     m = AutoModelForCausalLM.from_pretrained(path, torch_dtype=dtype, attn_implementation="sdpa", device_map="auto", max_memory=caps,
                                              config=yarn_config(path, yarn))
     m.eval().requires_grad_(False)
+    patch_moe(m)
     print(f"[models] {path} split over GPUs: {sorted(set(str(d) for d in m.hf_device_map.values()))}", flush=True)
     return m
 
 
-def load_pair(device, small_dir=SMALL_DIR, large_dir=LARGE_DIR, large_maxmem=LARGE_MAXMEM, yarn=None):
+def load_pair(device, small_dir=SMALL_DIR, large_dir=LARGE_DIR, large_maxmem=LARGE_MAXMEM, yarn=None, small_maxmem=SMALL_MAXMEM):
     """(large tokenizer, small model, large model). A small model with another tokenizer (Qwen <-> Llama) gets the
     C2C lookup table large id -> small id attached (prefill/tokalign.py; used by FastQwen3 and small_hidden_states).
     yarn: static YaRN factor for models without RoPE scaling of their own (Qwen3; see yarn_config)."""
     tok = AutoTokenizer.from_pretrained(large_dir)
-    small = load_frozen(small_dir, device, yarn=yarn)
+    small = load_split(small_dir, small_maxmem, yarn=yarn) if small_maxmem else load_frozen(small_dir, device, yarn=yarn)
     large = load_split(large_dir, large_maxmem, yarn=yarn) if large_maxmem else load_frozen(large_dir, device, yarn=yarn)
     tok_small = AutoTokenizer.from_pretrained(small_dir)
     if not same_tokenizer(tok, tok_small):

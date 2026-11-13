@@ -227,7 +227,7 @@ def main():
                 h_hat = None
             kl = masked_mean(kl_teacher_student(t_logits, s_logits), t_mask)
             nll = F.cross_entropy(s_logits.float().flatten(0, 1), ids[:, P:].flatten().to(s_logits.device))
-            loss = kl + a.lambda_nll * nll
+            loss = kl + a.lambda_nll * nll.to(kl.device)  # split teacher: its logits (and kl) sit on its last GPU
             if h_hat is not None:
                 n_s, n_m, _ = split_prompt(P, a.n_sink, a.n_tail)
                 h_mix = torch.cat([h_true[:, :, :n_s], h_hat.to(h_true.dtype), h_true[:, :, n_s + n_m:]], 2)

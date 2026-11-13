@@ -29,6 +29,10 @@ TEACHER_NAME = SMALL_NAME if TEACHER == "small" else LARGE_NAME
 # Split the large model over several GPUs for training (e.g. 32B): PREFILL_LARGE_MAXMEM="24GiB,76GiB" loads it with
 # device_map="auto" under these per-GPU caps; the small model, projector and losses stay on cuda:0.
 LARGE_MAXMEM = os.environ.get("PREFILL_LARGE_MAXMEM", "")
+# Same for the small (prefilling) model, e.g. a reverse pair whose source is Qwen3-30B-A3B (61 GB, > one 48 GB L40S):
+# PREFILL_SMALL_MAXMEM="22GiB,40GiB" splits it layer-wise over GPUs 0..n-1; the large model (decoder), projector and
+# losses stay on cuda:0. Hidden states are gathered on cuda:0 (kv.small_hidden_states, fast.FastQwen3).
+SMALL_MAXMEM = os.environ.get("PREFILL_SMALL_MAXMEM", "")
 
 # dataset name -> (hf repo, config name, text field)
 DATASETS = {

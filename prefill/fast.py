@@ -3,6 +3,8 @@ Fast inference path (same math as prefill/kv.py, much less overhead). Works with
 
   FastQwen3          lean Qwen3 (or Llama 3: same block without q/k norm) forward on plain tensors: fused QKV and gate/up weights (shared storage with the
                      HF model, no extra memory), no Cache objects, KV written straight into a preallocated buffer.
+                     Qwen3-MoE layers call the HF sparse-MoE block (prefill/moe.py); a model split over GPUs
+                     (models.load_split) is followed layer by layer in prefill(), outputs gathered on the embedding GPU.
   FoldedProjectorKV  exact algebraic folding of  projector tail (Linear d_mid->d_l, per-layer low-rank, bias)
                      -> input_layernorm -> k_proj / v_proj  into ONE batched matmul over all large layers.
                      The RMSNorm scale needs ||x||; it is computed exactly from a QR factor of the folded map.
@@ -64,18 +66,23 @@ class FastQwen3:
                 assert a.q_proj.bias is None and a.k_proj.bias is None and a.v_proj.bias is None
                 nq, nk = a.q_proj.weight.shape[0], a.k_proj.weight.shape[0]
                 wqkv = torch.cat([a.q_proj.weight, a.k_proj.weight, a.v_proj.weight], 0).contiguous()
-                ng = mlp.gate_proj.weight.shape[0]
-                wgu = torch.cat([mlp.gate_proj.weight, mlp.up_proj.weight], 0).contiguous()
+                dense = hasattr(mlp, "gate_proj")  # Qwen3-MoE: Qwen3MoeSparseMoeBlock (router + experts), run as is
+                if dense:
+                    ng = mlp.gate_proj.weight.shape[0]
+                    wgu = torch.cat([mlp.gate_proj.weight, mlp.up_proj.weight], 0).contiguous()
                 # re-point the HF modules at views of the fused tensors -> no duplicated weights
                 a.q_proj.weight = torch.nn.Parameter(wqkv[:nq], requires_grad=False)
                 a.k_proj.weight = torch.nn.Parameter(wqkv[nq:nq + nk], requires_grad=False)
                 a.v_proj.weight = torch.nn.Parameter(wqkv[nq + nk:], requires_grad=False)
-                mlp.gate_proj.weight = torch.nn.Parameter(wgu[:ng], requires_grad=False)
-                mlp.up_proj.weight = torch.nn.Parameter(wgu[ng:], requires_grad=False)
+                if dense:
+                    mlp.gate_proj.weight = torch.nn.Parameter(wgu[:ng], requires_grad=False)
+                    mlp.up_proj.weight = torch.nn.Parameter(wgu[ng:], requires_grad=False)
                 qn, kn = (a.q_norm.weight, a.k_norm.weight) if hasattr(a, "q_norm") else (None, None)  # Llama: none
                 self.layers.append(dict(ln1=L.input_layernorm.weight, wqkv=wqkv, qn=qn, kn=kn,
-                                        wo=a.o_proj.weight, ln2=L.post_attention_layernorm.weight, wgu=wgu,
-                                        wd=mlp.down_proj.weight))
+                                        wo=a.o_proj.weight, ln2=L.post_attention_layernorm.weight,
+                                        wgu=wgu if dense else None, wd=mlp.down_proj.weight if dense else None,
+                                        moe=None if dense else mlp, dev=wqkv.device))
+            self.multi_gpu = len({lw["dev"] for lw in self.layers} | {self.norm.device, self.embed.device}) > 1
             # RoPE table, computed exactly like Qwen3RotaryEmbedding (fp32, then cast)
             re = m.rotary_emb
             pos = torch.arange(cfg.max_position_embeddings, device=self.embed.device, dtype=torch.float32)
@@ -108,6 +115,8 @@ class FastQwen3:
         return rope(q, cos, sin), rope(k, cos, sin), v
 
     def _mlp(self, lw, h):
+        if lw["moe"] is not None:  # Qwen3-MoE block: [1, T, d] -> ([1, T, d], router logits)
+            return h + lw["moe"](rms(h, lw["ln2"], self.eps)[None])[0][0]
         g, u = F.linear(rms(h, lw["ln2"], self.eps), lw["wgu"]).chunk(2, -1)
         return h + F.linear(F.silu(g) * u, lw["wd"])
 
@@ -127,7 +136,13 @@ class FastQwen3:
         if collect:  # written in place: a list + torch.stack would hold every layer twice (7.8 GB for 1.7B at 64k)
             hs = torch.empty(len(self.layers) + 1, T, h.shape[-1], dtype=h.dtype, device=h.device)
             hs[0] = h
+        rope_on = {h.device: (cos, sin)}  # split model: RoPE tables per GPU
         for i, lw in enumerate(self.layers):
+            if self.multi_gpu and h.device != lw["dev"]:
+                h = h.to(lw["dev"])
+                if h.device not in rope_on:
+                    rope_on[h.device] = (cos.to(h.device), sin.to(h.device))
+                cos, sin = rope_on[h.device]
             q, k, v = self._qkv(lw, rms(h, lw["ln1"], self.eps), cos, sin)
             if kbuf is not None:
                 kbuf[i, :, :T] = k
@@ -141,10 +156,12 @@ class FastQwen3:
             if collect:
                 hs[i + 1] = h
         out_logits = None
+        if self.multi_gpu:
+            h = h.to(self.norm.device)
         if collect:
             hs[-1] = rms(h, self.norm, self.eps)  # HF appends the *normed* final state
         if logits:
-            out_logits = F.linear(rms(h[-1:], self.norm, self.eps), self.lm_head)
+            out_logits = F.linear(rms(h[-1:], self.norm, self.eps).to(self.lm_head.device), self.lm_head).to(self.embed.device)
         return out_logits, hs
 
     def extend(self, ids, cos, sin, kbuf, vbuf, segs, mask):
