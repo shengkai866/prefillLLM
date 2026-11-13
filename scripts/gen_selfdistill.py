@@ -6,6 +6,8 @@ end of turn, at most --max_new tokens) every prompt of a pool. Writes DATA_DIR/<
   prompt_len.npy                     prompt length of every sequence
   meta.jsonl                         pool metadata (+ "pool_idx")
 Work is done in shards (resumable after a crash); prompts are length-sorted and batched under a token budget.
+Generator: --model (default the large model, config.LARGE_DIR); a model too big for one GPU (Qwen3-30B-A3B on L40S)
+is split over the visible GPUs with --maxmem "22GiB,44GiB" (models.load_split). Same tokenizer as the pool required.
 Several GPUs: run one process per GPU with --worker k --n_workers N (each does shards k, k+N, ...), then once more
 without them to merge (all shards then exist, so it only merges).
 """
@@ -22,7 +24,7 @@ import torch  # noqa: E402
 from prefill import config as C  # noqa: E402
 from prefill.data import save_store  # noqa: E402
 from prefill.mixdata import PromptPool  # noqa: E402
-from prefill.models import eos_ids, load_frozen  # noqa: E402
+from prefill.models import eos_ids, load_frozen, load_split  # noqa: E402
 from transformers import AutoTokenizer  # noqa: E402
 
 
@@ -65,6 +67,8 @@ def main():
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--worker", type=int, default=0)
     ap.add_argument("--n_workers", type=int, default=1)
+    ap.add_argument("--model", default=C.LARGE_DIR, help="generator (default: the large model)")
+    ap.add_argument("--maxmem", default="", help="split the generator over GPUs 0..n-1 with these per-GPU caps")
     a = ap.parse_args()
     out_dir = os.path.join(C.DATA_DIR, a.out)
     if os.path.exists(os.path.join(out_dir, "meta.jsonl")):
@@ -73,10 +77,11 @@ def main():
     shard_dir = os.path.join(out_dir, "shards")
     os.makedirs(shard_dir, exist_ok=True)
     dev = torch.device(a.device)
-    tok = AutoTokenizer.from_pretrained(C.LARGE_DIR)
+    tok = AutoTokenizer.from_pretrained(a.model)
     pad = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
     eos = set(eos_ids(tok))
-    model = load_frozen(C.LARGE_DIR, dev)
+    model = load_split(a.model, a.maxmem) if a.maxmem else load_frozen(a.model, dev)
+    print(f"[selfdistill] generator {a.model}", flush=True)
     pool = PromptPool(a.pool)
     lens = np.diff(pool.offsets)
     order = sorted(range(len(pool)), key=lambda i: (pool.meta[i]["fmt"], -lens[i]))
