@@ -71,7 +71,7 @@ class Projector(nn.Module):
         ckpt = torch.load(path, map_location="cpu", weights_only=False)
         cfg = dict(ckpt["cfg"])
         kind = cfg.pop("kind", None)
-        m = (ProjectorWide if kind == "wide" else Projector)(**cfg)
+        m = {"wide": ProjectorWide, "moe": ProjectorMoE}.get(kind, Projector)(**cfg)
         m.load_state_dict(ckpt["state_dict"])
         return m.to(device), ckpt
 
@@ -144,6 +144,95 @@ class ProjectorWide(nn.Module):
 
     def layer_affine(self, l, dtype=torch.float64):
         return self.W2[l].detach().to(dtype), self.b2[l].detach().to(dtype)
+
+    num_params = Projector.num_params
+    save = Projector.save
+
+
+def parse_spans(text):
+    """'18-26' or '18-26,30-35' -> [[18, 26], [30, 35]] (inclusive large-layer ranges)."""
+    return [[int(x) for x in part.split("-")] for part in text.split(",") if part]
+
+
+class ProjectorMoE(nn.Module):
+    """
+    Layer-routed mixture of projectors ("MoE projector", branch moe-layers): several independent Projectors (experts),
+    each responsible for a fixed set of large-model layers. Routing is hard and by layer only (no gate):
+      expert 0      every large layer outside `spans`
+      expert i >= 1 the layers spans[i-1] = [a, b] (inclusive)
+    Default spans = [[18, 26]]: one expert for the layer group whose true K/V recovers most of the gap to the large
+    model (results/pdiag_06), one for the other 27 layers. Every expert is a full Projector of its own (layer mix over
+    all small layers, trunk W1 / W2, per-layer low-rank correction), so nothing is shared between the two groups.
+    Same interface as Projector (forward, first_stage, layer_affine, layer_mix, save / Projector.load); the folds see
+    it as a grouped-W1 projector (one W1 per expert).
+    """
+
+    def __init__(self, Ls, Ll, d_s, d_l, d_mid=2048, rank=256, in_norm=False, spans=((18, 26),)):
+        super().__init__()
+        spans = [[int(a), int(b)] for a, b in spans]
+        owner = torch.zeros(Ll, dtype=torch.long)
+        for i, (a, b) in enumerate(spans):
+            assert 0 <= a <= b < Ll, f"span {a}-{b} outside the {Ll} large layers"
+            assert (owner[a:b + 1] == 0).all(), "overlapping spans"
+            owner[a:b + 1] = i + 1
+        assert (owner == 0).any(), "the spans cover every layer: nothing left for expert 0"
+        self.cfg = dict(kind="moe", Ls=Ls, Ll=Ll, d_s=d_s, d_l=d_l, d_mid=d_mid, rank=rank, in_norm=in_norm, spans=spans)
+        local = torch.zeros(Ll, dtype=torch.long)
+        self.experts = nn.ModuleList()
+        for e in range(len(spans) + 1):
+            idx = (owner == e).nonzero().flatten()
+            p = Projector(Ls, len(idx), d_s, d_l, d_mid=d_mid, rank=rank, in_norm=False)  # input norm is applied once, here
+            with torch.no_grad():  # depth-proportional alignment by the GLOBAL layer index, as in Projector
+                p.layer_mix.zero_()
+                for j, l in enumerate(idx.tolist()):
+                    p.layer_mix[j, round(l * (Ls - 1) / max(Ll - 1, 1))] = 3.0
+            local[idx] = torch.arange(len(idx))
+            self.experts.append(p)
+        self.register_buffer("owner", owner, persistent=False)  # [Ll] expert of every large layer
+        self.register_buffer("local", local, persistent=False)  # [Ll] its row inside that expert
+        runs, l = [], 0  # maximal runs of consecutive layers of one expert: (expert, first local row, last + 1)
+        while l < Ll:
+            r = l
+            while r + 1 < Ll and owner[r + 1] == owner[l]:
+                r += 1
+            runs.append((int(owner[l]), int(local[l]), int(local[r]) + 1))
+            l = r + 1
+        self.runs = runs
+
+    @classmethod
+    @torch.no_grad()
+    def from_projector(cls, p, spans=((18, 26),)):
+        """Exact conversion of a trained Projector: every expert starts as a copy of p restricted to its layers."""
+        c = p.cfg
+        m = cls(c["Ls"], c["Ll"], c["d_s"], c["d_l"], d_mid=c["d_mid"], rank=c["rank"], in_norm=c.get("in_norm", False), spans=spans)
+        m = m.to(device=p.layer_mix.device, dtype=p.layer_mix.dtype)
+        for e, ex in enumerate(m.experts):
+            idx = (m.owner == e).nonzero().flatten()
+            ex.trunk.load_state_dict(p.trunk.state_dict())
+            for name in ("layer_mix", "down", "up", "bias"):
+                getattr(ex, name).copy_(getattr(p, name)[idx])
+        return m
+
+    def _assemble(self, parts):
+        """Per-expert tensors [n_e, ...] -> [Ll, ...] in large-layer order (one cat, no second copy)."""
+        return torch.cat([parts[e][lo:hi] for e, lo, hi in self.runs], 0)
+
+    def forward(self, hs_small):  # [Ls, B, T, d_s] -> [Ll, B, T, d_l]
+        if self.cfg.get("in_norm"):
+            hs_small = rms_unit(hs_small)
+        return self._assemble([ex(hs_small) for ex in self.experts])
+
+    @property
+    def layer_mix(self):  # [Ll, Ls] logits, in large-layer order (read by the folds)
+        return self._assemble([ex.layer_mix for ex in self.experts])
+
+    def first_stage(self):
+        """-> (W1 [G, d_mid, d_s], b1 [G, d_mid], expert of every large layer [Ll]); G = number of experts."""
+        return (torch.stack([ex.trunk[0].weight for ex in self.experts]),
+                torch.stack([ex.trunk[0].bias for ex in self.experts]), self.owner)
+
+    def layer_affine(self, l, dtype=torch.float64):
+        return self.experts[int(self.owner[l])].layer_affine(int(self.local[l]), dtype)
 
     num_params = Projector.num_params
     save = Projector.save

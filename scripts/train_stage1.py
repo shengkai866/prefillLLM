@@ -39,6 +39,8 @@ def main():
     ap.add_argument("--d_mid", type=int, default=2048)
     ap.add_argument("--rank", type=int, default=256)
     ap.add_argument("--in_norm", action="store_true", help="RMS-normalise small-model hidden states before the projector")
+    ap.add_argument("--moe_spans", default="", help='layer-routed MoE projector (prefill.projector.ProjectorMoE): large-layer '
+                    'ranges with an expert of their own, e.g. "18-26"; the remaining layers share one more expert')
     ap.add_argument("--save_every", type=int, default=500)
     ap.add_argument("--val_every", type=int, default=500)
     ap.add_argument("--val_seqs", type=int, default=8)
@@ -54,13 +56,14 @@ def main():
     log = Logger(os.path.join(a.out_dir, "train_log.jsonl"))
 
     tok, small, large = load_pair(device)
-    projector = new_projector(small, large, a.d_mid, a.rank, a.in_norm).to(device)
+    projector = new_projector(small, large, a.d_mid, a.rank, a.in_norm, a.moe_spans).to(device)
     step0 = 0
     if a.resume and os.path.exists(a.resume):
         projector, ck = Projector.load(a.resume, device)
         step0 = ck.get("step", 0)
         print(f"[resume] {a.resume} @ step {step0}")
-    print(f"[projector] {projector.num_params()/1e6:.1f}M params; Ls={projector.cfg['Ls']} Ll={projector.cfg['Ll']}")
+    print(f"[projector] {type(projector).__name__} {projector.num_params()/1e6:.1f}M params; Ls={projector.cfg['Ls']} "
+          f"Ll={projector.cfg['Ll']} spans={projector.cfg.get('spans')}")
     opt = torch.optim.AdamW(projector.parameters(), lr=a.lr, betas=(0.9, 0.95), weight_decay=0.01)
     sources = a.sources.split(",")
     train = MixedSampler(sources, "train", a.min_len, seed=a.seed)

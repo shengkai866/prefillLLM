@@ -5,7 +5,7 @@ import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 from .config import HF_CACHE_DIR, LARGE_DIR, LARGE_MAXMEM, SMALL_DIR
-from .projector import Projector
+from .projector import Projector, ProjectorMoE, parse_spans
 from .tokalign import load_or_build, same_tokenizer
 
 
@@ -62,9 +62,13 @@ def load_pair(device, small_dir=SMALL_DIR, large_dir=LARGE_DIR, large_maxmem=LAR
     return tok, small, large
 
 
-def new_projector(small, large, d_mid=2048, rank=256, in_norm=False):
+def new_projector(small, large, d_mid=2048, rank=256, in_norm=False, moe_spans=""):
+    """moe_spans: e.g. "18-26" -> ProjectorMoE with one expert for large layers 18..26 and one for the other layers."""
     Ls = small.config.num_hidden_layers + 1  # embeddings + every layer output
     Ll = large.config.num_hidden_layers
+    if moe_spans:
+        return ProjectorMoE(Ls, Ll, small.config.hidden_size, large.config.hidden_size, d_mid=d_mid, rank=rank, in_norm=in_norm,
+                            spans=parse_spans(moe_spans))
     return Projector(Ls, Ll, small.config.hidden_size, large.config.hidden_size, d_mid=d_mid, rank=rank, in_norm=in_norm)
 
 
