@@ -69,13 +69,16 @@ def main():
     ap.add_argument("--n_workers", type=int, default=1)
     ap.add_argument("--model", default=C.LARGE_DIR, help="generator (default: the large model)")
     ap.add_argument("--maxmem", default="", help="split the generator over GPUs 0..n-1 with these per-GPU caps")
+    ap.add_argument("--limit", type=int, default=0, help="dry run: generate only the first N prompts per format of the "
+                    "length-sorted order (the longest = largest batches in tokens), report time / peak GPU memory, write nothing")
     a = ap.parse_args()
     out_dir = os.path.join(C.DATA_DIR, a.out)
-    if os.path.exists(os.path.join(out_dir, "meta.jsonl")):
-        print(f"[selfdistill] {a.out} exists, skip")
-        return
-    shard_dir = os.path.join(out_dir, "shards")
-    os.makedirs(shard_dir, exist_ok=True)
+    if not a.limit:
+        if os.path.exists(os.path.join(out_dir, "meta.jsonl")):
+            print(f"[selfdistill] {a.out} exists, skip")
+            return
+        shard_dir = os.path.join(out_dir, "shards")
+        os.makedirs(shard_dir, exist_ok=True)
     dev = torch.device(a.device)
     tok = AutoTokenizer.from_pretrained(a.model)
     pad = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
@@ -87,6 +90,22 @@ def main():
     order = sorted(range(len(pool)), key=lambda i: (pool.meta[i]["fmt"], -lens[i]))
     shards = [order[k:k + a.shard] for k in range(0, len(order), a.shard)]
     print(f"[selfdistill] {a.pool} -> {a.out}: {len(pool)} prompts, {len(shards)} shards, greedy={a.greedy}", flush=True)
+    if a.limit:
+        for fmt in ("raw", "chat"):
+            group = sorted((i for i in range(len(pool)) if pool.meta[i]["fmt"] == fmt), key=lambda i: -lens[i])[:a.limit]
+            j, t0, n_new = 0, time.time(), 0
+            while j < len(group):
+                bs = max(1, min(a.max_batch, a.batch_tokens // (int(lens[group[j]]) + a.max_new)))
+                batch = group[j:j + bs]
+                j += bs
+                resp = generate_batch(model, [pool.ids(i).tolist() for i in batch], fmt == "raw", a, pad, eos, dev)
+                n_new += sum(len(r) for r in resp)
+                print(f"[selfdistill dry run] {fmt}: batch of {len(batch)} x <= {int(lens[batch[0]])} tokens", flush=True)
+            if group:
+                peak = [f"{torch.cuda.max_memory_allocated(g) / 2**30:.1f}" for g in range(torch.cuda.device_count())]
+                print(f"[selfdistill dry run] {a.pool} {fmt}: {len(group)} longest prompts, {n_new} new tokens, "
+                      f"{time.time() - t0:.0f} s; peak GPU memory (GiB) {peak}", flush=True)
+        return
     t0, done = time.time(), 0
     for si, idxs in enumerate(shards):
         path = os.path.join(shard_dir, f"{si:04d}.json")

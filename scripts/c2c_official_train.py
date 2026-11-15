@@ -38,6 +38,7 @@ if SPLIT:
         if os.path.abspath(str(path)) == TEACHER:
             k.update(device_map="auto", max_memory=caps)
             m = _orig_fp(cls, path, *a, **k)
+            assert all(isinstance(d, int) for d in m.hf_device_map.values()), f"sharer does not fit the GPUs with caps {SPLIT}"
             patch_moe(m)
             print(f"[c2c split] sharer {path} over GPUs {sorted(set(str(d) for d in m.hf_device_map.values()))}", flush=True)
             return m
@@ -60,6 +61,36 @@ if SPLIT:
         return _orig_proj(self, tuple(x.to(dev) for x in source_kv), target_kv, *a, **k)
 
     C2CProjector.forward = _proj_forward
+
+    import atexit
+
+    @atexit.register
+    def _peak():
+        peak = [f"{torch.cuda.max_memory_allocated(g) / 2**30:.1f}" for g in range(torch.cuda.device_count())]
+        print(f"[c2c split] peak GPU memory (GiB) {peak}", flush=True)
+
+# Memory test (smoke only): PREFILL_C2C_LONGEST=N trains on the N longest training samples instead of the whole set, so
+# the few steps of a smoke run see the largest batches the real run can draw.
+LONGEST = int(os.environ.get("PREFILL_C2C_LONGEST", "0"))
+if LONGEST:
+    import torch.utils.data as tud
+
+    class _LongestLoader(tud.DataLoader):
+        def __init__(self, dataset, *a, **k):
+            if k.get("shuffle"):
+                col = k["collate_fn"]
+
+                def n_tok(i):
+                    x = col([dataset[i]])["input_ids"]
+                    return (x[0] if isinstance(x, list) else x).shape[-1]
+
+                lens = sorted(((n_tok(i), i) for i in range(len(dataset))), reverse=True)[:LONGEST]
+                print(f"[c2c longest] training on the {len(lens)} longest of {len(dataset)} samples: "
+                      f"{[n for n, _ in lens]} tokens", flush=True)
+                dataset = tud.Subset(dataset, [i for _, i in lens])
+            super().__init__(dataset, *a, **k)
+
+    tud.DataLoader = _LongestLoader
 script = os.path.join(C2C_DIR, "script", "train", "SFT_train.py")
 sys.argv = [script] + sys.argv[1:]
 os.chdir(C2C_DIR)

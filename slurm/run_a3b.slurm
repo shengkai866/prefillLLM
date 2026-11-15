@@ -66,7 +66,13 @@ should() { if [[ $run == 1 || $1 == "$START_AT" ]]; then run=1; return 0; fi; re
 FAILED=""
 ev() { "$@" || { FAILED="$FAILED $1:$3"; echo "!!!!!!!! FAILED: $*"; }; }  # isolated eval step
 
-# C2C official recipe (E2) for this pair; $1 = output dir, $2 = number of OpenHermes samples, $3 = gradient accumulation
+# C2C official recipe (E2) for this pair; $1 = output dir, $2 = number of OpenHermes samples, $3 = gradient accumulation.
+# The official recipe is 4 samples x accum 64 (256 per update). With ~17 GiB of the 30B-A3B on cuda:0 a batch of 4 does
+# not fit next to the trainer's un-checkpointed fuser graph (smoke 28159362: OOM), so it is 2 x accum 128: the same 256
+# samples per update and the same number of updates / schedule.
+E2_BS=${E2_BS:-2}
+# E2 only: as much of the 30B-A3B as possible on cuda:1 (embeddings + 14 layers on cuda:0, 34 layers + head on cuda:1)
+E2_MAXMEM=${E2_MAXMEM:-18GiB,42GiB}
 e2_recipe() {
   mkdir -p $1
   cat > $1/recipe.json <<EOF
@@ -82,7 +88,7 @@ e2_recipe() {
   },
   "training": {"learning_rate": 1e-4, "weight_decay": 0.01, "num_epochs": 1, "max_length": 2048, "device": "cuda",
     "scheduler_type": "linear", "warmup_ratio": 0.1, "max_grad_norm": 1.0, "gradient_accumulation_steps": $3,
-    "per_device_train_batch_size": 4, "num_processes": 1, "freeze": ["teacher", "base"], "seed": 42},
+    "per_device_train_batch_size": $E2_BS, "num_processes": 1, "freeze": ["teacher", "base"], "seed": 42},
   "output": {"output_dir": "$1", "save_steps": 250, "eval_steps": 100,
     "wandb_config": {"project": "Rosetta", "mode": "disabled", "entity": null, "run_name": "$(basename $1)"}},
   "data": {"type": "OpenHermesChatDataset", "kwargs": {"split": "train", "max_word_count": 2048, "num_samples": $2},
@@ -91,18 +97,19 @@ e2_recipe() {
 EOF
 }
 e2_train() {  # official trainer, sharer split over the GPUs; drop any whole-model dumps afterwards
-  PREFILL_C2C_TEACHER_MAXMEM=$PREFILL_SMALL_MAXMEM python scripts/c2c_official_train.py --config $1/recipe.json || return 1
+  PREFILL_C2C_TEACHER_MAXMEM=$E2_MAXMEM PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python scripts/c2c_official_train.py --config $1/recipe.json || return 1
   rm -f $1/final/model.pt $1/checkpoint-*/model.pt
 }
 
 if [[ $METHOD == smoke ]]; then
   set -e
   SM=$CK/$TAG
+  if [[ -z $SMOKE_FROM_E2 ]]; then  # SMOKE_FROM_E2=1: only the E2 and generation tests (the rest passed in 28159362)
   rm -rf $SM
-  step "smoke 1/5: CPU tests (MoE forward / FastQwen3 MoE == HF; C2C == official RosettaModel)"
+  step "smoke 1/6: CPU tests (MoE forward / FastQwen3 MoE == HF; C2C == official RosettaModel)"
   python tests/test_moe.py
   python tests/smoke_c2c.py
-  step "smoke 2/5: our projector, stage 1 + stage 2 a few steps, tiny evals with every config (big, small, hyb)"
+  step "smoke 2/6: our projector, stage 1 + stage 2 a few steps, tiny evals with every config (big, small, hyb)"
   python scripts/train_stage1.py --in_norm --out_dir $SM/s1 --max_steps 6 --accum 2 --val_every 3 --val_seqs 2 --save_every 1000
   python scripts/train_stage2.py --init $SM/s1/projector.pt --out_dir $SM/s2 --max_steps 4 --accum 2 \
     --val_every 2 --val_per_type 1 --save_every 1000 --save_step_every 0 --sd sd_mix4k,sd_mixlong --max_prompt 8064 --curriculum_frac 0
@@ -110,16 +117,21 @@ if [[ $METHOD == smoke ]]; then
   python scripts/eval_recompute.py --projector $SM/s2/projector.pt --out_dir $SM/e_main --tasks niah,gsm8k,quality \
     --configs big,small,hyb --n_gsm8k 2 --n_quality 3
   grep -h "KL" -A4 $SM/e_v2/summary.md | head -6 || true
-  step "smoke 3/5: C2C E3 (our objective) a few steps + tiny evals"
+  step "smoke 3/6: C2C E3 (our objective) a few steps + tiny evals"
   python scripts/train_stage2.py --init c2c --out_dir $SM/e3 --max_steps 4 --accum 2 --lr 1e-4 --warmup 1 \
     --val_every 2 --val_per_type 1 --save_every 1000 --save_step_every 0 --sd sd_mix4k,sd_mixlong --max_prompt 8064 --curriculum_frac 0
   python scripts/evaluate_v2.py --projectors e3=$SM/e3/projector.pt --baselines big --tasks kl --n_kl 1 --out_dir $SM/e3/e_v2
   python scripts/eval_recompute.py --projector $SM/e3/projector.pt --out_dir $SM/e3/e_main --tasks niah,gsm8k --configs hyb --n_gsm8k 2
-  step "smoke 4/5: C2C E2 (official trainer, split sharer) on 64 OpenHermes samples, then a tiny eval of its fuser"
-  e2_recipe $SM/e2 64 2
-  e2_train $SM/e2
+  fi
+  step "smoke 4/6: C2C E2 (official trainer, split sharer $E2_MAXMEM, batch $E2_BS) on the 16 longest of 2000 OpenHermes samples (memory worst case), then a tiny eval of its fuser"
+  rm -rf $SM/e2
+  e2_recipe $SM/e2 2000 2
+  PREFILL_C2C_LONGEST=16 e2_train $SM/e2
   python scripts/eval_recompute.py --projector $SM/e2/final --out_dir $SM/e2/e_main --tasks niah,gsm8k --configs hyb --n_gsm8k 2
-  step "smoke 5/5: GPU memory"
+  step "smoke 5/6: 30B-A3B generation dry run on the longest prompts of each pool (time, peak memory; writes nothing)"
+  python scripts/gen_selfdistill.py --pool mixlong_train --out none --limit 12 --model $PREFILL_SMALL_DIR --maxmem 28GiB,44GiB
+  python scripts/gen_selfdistill.py --pool mix4k_train --out none --limit 24 --model $PREFILL_SMALL_DIR --maxmem 28GiB,44GiB
+  step "smoke 6/6: GPU memory"
   nvidia-smi --query-gpu=index,memory.used,memory.total --format=csv
   set +e
   step "smoke passed"
