@@ -5,7 +5,7 @@ import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 from .config import HF_CACHE_DIR, LARGE_DIR, LARGE_MAXMEM, SMALL_DIR, SMALL_MAXMEM, TEACHER
-from .projector import Projector
+from .projector import Projector, ProjectorTokMoE
 from .tokalign import load_or_build, same_tokenizer, shared_vocab
 
 
@@ -77,9 +77,13 @@ def load_pair(device, small_dir=SMALL_DIR, large_dir=LARGE_DIR, large_maxmem=LAR
     return tok, small, large
 
 
-def new_projector(small, large, d_mid=2048, rank=256, in_norm=False):
+def new_projector(small, large, d_mid=2048, rank=256, in_norm=False, tmoe=0, tmoe_topk=2, tmoe_band=0.0):
+    """tmoe > 0: token-routed MoE projector with that many experts (projector.ProjectorTokMoE)."""
     Ls = small.config.num_hidden_layers + 1  # embeddings + every layer output
     Ll = large.config.num_hidden_layers
+    if tmoe:
+        return ProjectorTokMoE(Ls, Ll, small.config.hidden_size, large.config.hidden_size, d_mid=d_mid, rank=rank,
+                               in_norm=in_norm, n_experts=tmoe, top_k=tmoe_topk, band=tmoe_band)
     return Projector(Ls, Ll, small.config.hidden_size, large.config.hidden_size, d_mid=d_mid, rank=rank, in_norm=in_norm)
 
 

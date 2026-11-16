@@ -275,9 +275,40 @@ class FoldedProjectorKV:
             vdst[:, :, c0:c1] = v
 
 
+class TokMoEKV:
+    """Projector -> KV stage of a token-routed MoE projector (projector.ProjectorTokMoE); same call as
+    FoldedProjectorKV. Not folded: the projector runs as in training (bf16 autocast on GPU, so the routing decisions
+    are the training ones), then the large model's own input_layernorm -> k_proj / v_proj -> k_norm -> RoPE."""
+
+    def __init__(self, projector, large_fast: FastQwen3, chunk=2048):
+        self.p, self.L, self.chunk = projector.eval(), large_fast, chunk
+        self.in_norm = bool(projector.cfg.get("in_norm"))
+
+    def __call__(self, hs, cos, sin, kdst, vdst, n_layers=None):
+        L = self.L
+        n = hs.shape[1]
+        Ll = L.n_layers if n_layers is None else n_layers
+        nq = L.H * L.D
+        for c0 in range(0, n, self.chunk):
+            c1 = min(n, c0 + self.chunk)
+            with torch.autocast(device_type="cuda", dtype=torch.bfloat16, enabled=hs.is_cuda):
+                x = self.p(hs[:, None, c0:c1])[:, 0]  # [Ll_all, nc, d_l]
+            for l in range(Ll):
+                lw = L.layers[l]
+                kv = F.linear(rms(x[l].to(L.embed.dtype), lw["ln1"], L.eps), lw["wqkv"][nq:])
+                k, v = kv.view(c1 - c0, 2, L.Hkv, L.D).unbind(1)
+                if lw["kn"] is not None:
+                    k = rms(k, lw["kn"], L.eps)
+                kdst[l, :, c0:c1] = rope(k.transpose(0, 1), cos[c0:c1], sin[c0:c1])
+                vdst[l, :, c0:c1] = v.transpose(0, 1)
+
+
 def build_fold(projector, large_fast, mode=None):
     """The projector -> KV stage: FusedFoldKV (Triton, prefill/fold_fused.py) or the eager FoldedProjectorKV.
-    mode / $PREFILL_FOLD = fused (default) | eager; CPU always gets the eager version."""
+    mode / $PREFILL_FOLD = fused (default) | eager; CPU always gets the eager version.
+    A token-routed MoE projector always gets TokMoEKV."""
+    if projector.cfg.get("kind") == "tmoe":
+        return TokMoEKV(projector, large_fast)
     mode = mode or os.environ.get("PREFILL_FOLD", "fused")
     if mode == "fused" and large_fast.embed.is_cuda:
         from .fold_fused import FusedFoldKV

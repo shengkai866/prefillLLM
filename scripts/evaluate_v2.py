@@ -32,7 +32,7 @@ import torch.nn.functional as F  # noqa: E402
 
 from prefill import config as C  # noqa: E402
 from prefill.data import TokenStore  # noqa: E402
-from prefill.fast import FastBig, FastHybrid, FastQwen3, FoldedProjectorKV, kv_to_dynamic_cache  # noqa: E402
+from prefill.fast import FastBig, FastHybrid, FastQwen3, build_fold, kv_to_dynamic_cache  # noqa: E402
 from prefill.kv import greedy_decode, kl_teacher_student, teacher_forward, true_prefill  # noqa: E402
 from prefill.xteacher import NativeTeacher  # noqa: E402
 from prefill.mixdata import PromptPool, Tok  # noqa: E402
@@ -68,7 +68,7 @@ class Engine:
         if getattr(p, "is_c2c", False):  # C2C fuser (prefill/c2c.py): same (kbuf, vbuf, logits) interface
             self.hyb[tag] = (p, _C2CPrefiller(self.large, self.small, p))
             return ck.get("step")
-        self.hyb[tag] = (p, FastHybrid(self.S, self.L, FoldedProjectorKV(p, self.L), self.n_sink, self.n_tail))
+        self.hyb[tag] = (p, FastHybrid(self.S, self.L, build_fold(p, self.L, "eager"), self.n_sink, self.n_tail))
         return ck.get("step")
 
     def drop(self, tag):

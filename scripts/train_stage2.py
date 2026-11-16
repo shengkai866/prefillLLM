@@ -26,7 +26,7 @@ from prefill.kv import kl_teacher_student, split_prompt, student_forward, teache
 from prefill.losses import attention_output_loss  # noqa: E402
 from prefill.models import eos_ids, load_pair, teacher_of  # noqa: E402
 from prefill.xteacher import NativeTeacher, masked_mean  # noqa: E402
-from prefill.projector import Projector  # noqa: E402
+from prefill.projector import Projector, ProjectorTokMoE  # noqa: E402
 from prefill.trainutil import Logger, cosine_lr, validate_hybrid  # noqa: E402
 
 
@@ -135,6 +135,12 @@ def main():
                     "(round 2); when given, the built-in round-1 web generation is skipped")
     ap.add_argument("--val_sd", default="sd_mixtest", help="held-out self-distillation store for per-type validation")
     ap.add_argument("--val_per_type", type=int, default=2)
+    ap.add_argument("--tmoe", type=int, default=0, help="token-routed MoE projector with this many experts (0 = keep --init as it is); a plain Projector --init is converted exactly (every expert = its trunk), a MoE --init is kept")
+    ap.add_argument("--tmoe_topk", type=int, default=2, help="experts per (layer, token) cell")
+    ap.add_argument("--tmoe_band", type=float, default=0.0, help="initial layer prior of the gate: neighbouring layers prefer the same experts (0 = none)")
+    ap.add_argument("--lambda_bal", type=float, default=0.01, help="weight of the MoE load-balance loss")
+    ap.add_argument("--probe_longest", action="store_true", help="first run one forward/backward on the longest training "
+                    "sequence and print the peak GPU memory (catches an OOM before the length curriculum reaches it)")
     ap.add_argument("--save_step_every", type=int, default=2000, help="also keep projector_step<N>.pt every N steps")
     ap.add_argument("--start_step", type=int, default=0, help="resume an interrupted run: --init its projector.pt, continue "
                     "LR schedule and curriculum from this step (optimizer state is not saved, so the LR re-ramps over --warmup)")
@@ -186,8 +192,31 @@ def main():
         projector, ck = Projector.load(a.init, device)
         print(f"[init] {a.init} (stage1 step {ck.get('step')}) ; {projector.num_params()/1e6:.1f}M params")
     is_c2c = getattr(projector, "is_c2c", False)
+    if a.tmoe and not is_c2c and projector.cfg.get("kind") != "tmoe":
+        projector = ProjectorTokMoE.from_projector(projector, a.tmoe, a.tmoe_topk, a.tmoe_band)
+        print(f"[tmoe] converted: {a.tmoe} experts, top-{a.tmoe_topk}, band {a.tmoe_band} ; {projector.num_params()/1e6:.1f}M params")
     projector.train()
     opt = torch.optim.AdamW(projector.parameters(), lr=a.lr, betas=(0.9, 0.95), weight_decay=a.wd)
+
+    def run_one(it):
+        """KL + NLL (+ MoE load balance) of one training sequence, plain path (no attention loss, no native teacher)."""
+        ids, P = sd_get(it).unsqueeze(0).to(device), sd_plen(it)
+        t_logits = teacher_forward(teacher, ids, P)
+        s_logits = student_forward(large, small, projector, ids, P, a.n_sink, a.n_tail)
+        loss = kl_teacher_student(t_logits, s_logits).mean()
+        loss = loss + a.lambda_nll * F.cross_entropy(s_logits.float().flatten(0, 1), ids[:, P:].flatten().to(s_logits.device)).to(loss.device)
+        if getattr(projector, "aux", None) is not None:
+            loss = loss + a.lambda_bal * projector.aux.to(loss.device)
+        return loss, ids.shape[1]
+
+    if a.probe_longest:
+        it = items[int(np.argmax(item_plen))]  # longest prompt
+        loss, n = run_one(it)
+        loss.backward()
+        opt.zero_grad(set_to_none=True)
+        peak = [torch.cuda.max_memory_allocated(i) / 2 ** 30 for i in range(torch.cuda.device_count())]
+        print(f"[probe] longest prompt, sequence of {n} tokens: loss {loss.item():.4f}, peak GiB per GPU {[round(x, 1) for x in peak]}", flush=True)
+        del loss
 
     if a.start_step and ck.get("step") != a.start_step:
         print(f"[warn] --start_step {a.start_step} but {a.init} was saved at step {ck.get('step')}")
@@ -235,6 +264,10 @@ def main():
                 loss_a = attention_output_loss(large, h_mix, h_true, n_s, layers=layers)
                 loss = loss + a.lambda_attn * loss_a.to(loss.device)
                 stats["attn"] = stats.get("attn", 0) + loss_a.item() / a.accum
+            if getattr(projector, "aux", None) is not None:  # token-routed MoE: load balance
+                loss = loss + a.lambda_bal * projector.aux.to(loss.device)
+                stats["bal"] = stats.get("bal", 0) + projector.aux.item() / a.accum
+                stats.update(projector.stats)
             (loss / a.accum).backward()
             stats["kl"] = stats.get("kl", 0) + kl.item() / a.accum
             stats["nll"] = stats.get("nll", 0) + nll.item() / a.accum

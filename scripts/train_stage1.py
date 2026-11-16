@@ -39,6 +39,10 @@ def main():
     ap.add_argument("--d_mid", type=int, default=2048)
     ap.add_argument("--rank", type=int, default=256)
     ap.add_argument("--in_norm", action="store_true", help="RMS-normalise small-model hidden states before the projector")
+    ap.add_argument("--tmoe", type=int, default=0, help="token-routed MoE projector with this many experts (0 = plain Projector)")
+    ap.add_argument("--tmoe_topk", type=int, default=2, help="experts per (layer, token) cell")
+    ap.add_argument("--tmoe_band", type=float, default=0.0, help="initial layer prior of the gate: neighbouring layers prefer the same experts (0 = none)")
+    ap.add_argument("--lambda_bal", type=float, default=0.01, help="weight of the MoE load-balance loss")
     ap.add_argument("--save_every", type=int, default=500)
     ap.add_argument("--val_every", type=int, default=500)
     ap.add_argument("--val_seqs", type=int, default=8)
@@ -54,7 +58,7 @@ def main():
     log = Logger(os.path.join(a.out_dir, "train_log.jsonl"))
 
     tok, small, large = load_pair(device)
-    projector = new_projector(small, large, a.d_mid, a.rank, a.in_norm).to(device)
+    projector = new_projector(small, large, a.d_mid, a.rank, a.in_norm, a.tmoe, a.tmoe_topk, a.tmoe_band).to(device)
     step0 = 0
     if a.resume and os.path.exists(a.resume):
         projector, ck = Projector.load(a.resume, device)
@@ -89,6 +93,10 @@ def main():
                 loss_a = attention_output_loss(large, h_hat, h_true, a.n_sink, a.attn_layers)
                 loss = loss + a.lambda_attn * loss_a
                 stats["attn"] = stats.get("attn", 0) + loss_a.item() / a.accum
+            if getattr(projector, "aux", None) is not None:  # token-routed MoE: load balance
+                loss = loss + a.lambda_bal * projector.aux
+                stats["bal"] = stats.get("bal", 0) + projector.aux.item() / a.accum
+                stats.update(projector.stats)
             (loss / a.accum).backward()
             stats["loss"] = stats.get("loss", 0) + loss.item() / a.accum
             stats["cos"] = stats.get("cos", 0) + info["cos"].mean().item() / a.accum
